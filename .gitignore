@@ -18,3 +18,6 @@ data/splits/*.csv
 *.log
 .DS_Store
 Thumbs.db
+
+# Claude Code session export - not part of the project
+.claude.zip

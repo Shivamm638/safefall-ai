@@ -38,24 +38,30 @@ def build_model(
     n_classes: int = config.NUM_CLASSES,
     learning_rate: float = config.LEARNING_RATE,
     seed: int = config.RANDOM_SEED,
+    l2: float = config.L2_REGULARISATION,
+    dropout_geo: float = 0.30,
+    dropout_head1: float = 0.45,
+    dropout_head2: float = 0.35,
+    width: int = 1,
 ):
     """Compile and return the two-branch Keras model."""
     import tensorflow as tf
     from tensorflow.keras import layers, models, optimizers, regularizers
 
     tf.keras.utils.set_random_seed(seed)
-    reg = regularizers.l2(config.L2_REGULARISATION)
+    reg = regularizers.l2(l2)
+    c1, c2 = int(64 * width), int(128 * width)
 
     # ---------------- Branch A: convolutions over the skeleton -------------- #
     lm_in = layers.Input(shape=landmark_shape, name="landmarks")
-    x = layers.Conv1D(64, 3, padding="same", activation="relu",
+    x = layers.Conv1D(c1, 3, padding="same", activation="relu",
                       kernel_regularizer=reg, name="conv1")(lm_in)
     x = layers.BatchNormalization(name="bn1")(x)
-    x = layers.Conv1D(128, 3, padding="same", activation="relu",
+    x = layers.Conv1D(c2, 3, padding="same", activation="relu",
                       kernel_regularizer=reg, name="conv2")(x)
     x = layers.BatchNormalization(name="bn2")(x)
     x = layers.MaxPooling1D(2, name="pool1")(x)
-    x = layers.Conv1D(128, 3, padding="same", activation="relu",
+    x = layers.Conv1D(c2, 3, padding="same", activation="relu",
                       kernel_regularizer=reg, name="conv3")(x)
     x = layers.BatchNormalization(name="bn3")(x)
     avg = layers.GlobalAveragePooling1D(name="gap")(x)
@@ -64,16 +70,16 @@ def build_model(
 
     # ---------------- Branch B: clinical posture descriptors ---------------- #
     geo_in = layers.Input(shape=(n_geometric,), name="geometry")
-    g = layers.Dense(64, activation="relu", kernel_regularizer=reg, name="geo_dense")(geo_in)
+    g = layers.Dense(int(64 * width), activation="relu", kernel_regularizer=reg, name="geo_dense")(geo_in)
     g = layers.BatchNormalization(name="geo_bn")(g)
-    g = layers.Dropout(0.3, name="geo_drop")(g)
+    g = layers.Dropout(dropout_geo, name="geo_drop")(g)
 
     # ---------------- Fusion head ------------------------------------------- #
     z = layers.Concatenate(name="fusion")([pose_branch, g])
-    z = layers.Dense(128, activation="relu", kernel_regularizer=reg, name="head1")(z)
-    z = layers.Dropout(0.45, name="head_drop1")(z)
-    z = layers.Dense(64, activation="relu", kernel_regularizer=reg, name="head2")(z)
-    z = layers.Dropout(0.35, name="head_drop2")(z)
+    z = layers.Dense(int(128 * width), activation="relu", kernel_regularizer=reg, name="head1")(z)
+    z = layers.Dropout(dropout_head1, name="head_drop1")(z)
+    z = layers.Dense(int(64 * width), activation="relu", kernel_regularizer=reg, name="head2")(z)
+    z = layers.Dropout(dropout_head2, name="head_drop2")(z)
     out = layers.Dense(n_classes, activation="softmax", name="activity")(z)
 
     model = models.Model(inputs=[lm_in, geo_in], outputs=out, name="SafeFall_PoseCNN")
