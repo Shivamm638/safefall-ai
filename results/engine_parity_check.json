@@ -1,0 +1,9 @@
+{
+  "samples": 1975,
+  "max_abs_difference": 1.0132789611816406e-06,
+  "mean_abs_difference": 3.726282216121035e-08,
+  "predicted_class_agreement": 1.0,
+  "tolerance": 0.0001,
+  "passed": true,
+  "weights_file_kb": 465.3
+}

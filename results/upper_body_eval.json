@@ -1,0 +1,11 @@
+{
+  "cue": "shoulder_tilt",
+  "threshold": 26.0,
+  "validation_accuracy": 0.8461538461538461,
+  "test_accuracy": 0.7848101265822784,
+  "test_fall_recall": 0.9042553191489362,
+  "test_fall_precision": 0.7172995780590717,
+  "test_false_alarm_rate": 0.32367149758454106,
+  "test_crops": 395,
+  "note": "Measured on head-and-shoulders crops of held-out Le2i frames, which simulate a laptop-webcam view. Fall vs not-fall only - the upper body cannot distinguish walking from standing."
+}

@@ -1,0 +1,58 @@
+CONFUSION MATRIX ANALYSIS - SafeFall AI test set
+====================================================================
+Test frames analysed              : 1,975
+Frames that really were a fall    : 429
+
+1. FALL DETECTION (the safety-critical row)
+--------------------------------------------------------------------
+   Correct fall detections        : 401 of 429 (93.5% recall / sensitivity)
+   Missed falls (false negatives) : 28 (6.5% of all falls)
+   False alarms (false positives) : 124 (8.02% of all non-fall frames)
+   Specificity on non-fall frames : 91.98%
+
+   Reading: recall matters most here. Every missed fall is an elderly
+   resident left on the floor unattended, whereas a false alarm only
+   costs a caregiver a few seconds to dismiss.
+
+2. WHERE THE FALL ALERTS COME FROM
+--------------------------------------------------------------------
+       93 frames of 'Normal Activity' were alerted as a fall (36.76% of that activity)
+       28 frames of 'Sitting' were alerted as a fall (8.62% of that activity)
+        2 frames of 'Standing' were alerted as a fall (0.37% of that activity)
+        1 frames of 'Walking' were alerted as a fall (0.24% of that activity)
+
+3. WHICH ACTIVITIES THE MODEL CONFUSES
+--------------------------------------------------------------------
+       93 frames (36.76%) of 'Normal Activity' predicted as 'Fall Detected'
+       37 frames (8.73%) of 'Walking' predicted as 'Standing'
+       36 frames (14.23%) of 'Normal Activity' predicted as 'Sitting'
+       34 frames (6.25%) of 'Standing' predicted as 'Walking'
+       28 frames (8.62%) of 'Sitting' predicted as 'Fall Detected'
+
+   Reading:
+   - Normal Activity vs Fall Detected: Normal Activity covers bending and
+     crouching, which are exactly the postures halfway between upright and
+     on-the-floor. The model errs toward raising an alert, which is the
+     correct bias for a fall monitor.
+   - Walking vs Standing: Standing and Walking differ only by stance width
+     in a still image - a mid-stride frame and a stood-with-feet-apart
+     frame are the same posture. Both are safe states, so this costs
+     nothing clinically, and the video pipeline resolves it using measured
+     motion.
+   - Normal Activity vs Sitting: Crouching and perching on the edge of a
+     seat produce almost the same knee and hip angles.
+   - Sitting vs Fall Detected: Sitting on a chair and sitting on the floor
+     after a fall both show a collapsed body height with bent knees. The
+     distinguishing cue is how close the hips are to the ankles, which is
+     subtle and camera dependent. Over-alerting here is the safe direction
+     of error.
+   - 170 of the 322 errors (53%) are swaps between two safe activities,
+     which never change the alert the caregiver sees.
+
+4. PER-CLASS RECALL
+--------------------------------------------------------------------
+   Fall Detected      93.47%   (support 429 frames)
+   Normal Activity    39.53%   (support 253 frames)
+   Sitting            89.85%   (support 325 frames)
+   Standing           90.81%   (support 544 frames)
+   Walking            86.32%   (support 424 frames)

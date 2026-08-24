@@ -1,0 +1,14 @@
+SafeFall AI - classification report on the held-out test videos
+========================================================================
+                 precision    recall  f1-score   support
+
+  Fall Detected     0.7638    0.9347    0.8407       429
+Normal Activity     0.7092    0.3953    0.5076       253
+        Sitting     0.8391    0.8985    0.8678       325
+       Standing     0.8933    0.9081    0.9006       544
+        Walking     0.8971    0.8632    0.8798       424
+
+       accuracy                         0.8370      1975
+      macro avg     0.8205    0.7999    0.7993      1975
+   weighted avg     0.8335    0.8370    0.8274      1975
+

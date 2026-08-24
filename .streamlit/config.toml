@@ -1,0 +1,16 @@
+# Fixed dark clinical theme so the dashboard looks identical on the marker's
+# machine, in the deployed app and in the walkthrough recording.
+[theme]
+base = "dark"
+primaryColor = "#2DD4BF"
+backgroundColor = "#0B1220"
+secondaryBackgroundColor = "#141E30"
+textColor = "#E6EDF6"
+font = "sans serif"
+
+[server]
+maxUploadSize = 200
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false

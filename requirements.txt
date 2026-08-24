@@ -1,0 +1,28 @@
+# SafeFall AI - runtime dependencies for the deployed Streamlit dashboard.
+#
+# TensorFlow is deliberately NOT listed here. The dashboard runs the trained
+# network through the pure-NumPy engine in src/numpy_inference.py, which loads
+# the exported Keras weights and reproduces them to within 1e-6 (see
+# results/engine_parity_check.json). That keeps the deployed app well inside
+# the 1 GB memory limit of Streamlit Community Cloud.
+#
+# To reproduce training instead, install requirements-dev.txt.
+
+streamlit==1.49.1
+mediapipe==0.10.21
+numpy==1.26.4
+pandas==2.3.3
+plotly==6.9.0
+pillow==11.3.0
+protobuf==4.25.9
+
+# MediaPipe's drawing_utils imports matplotlib at module load, so the pose
+# overlay silently depends on it. mediapipe does declare it, but pinning it
+# here means a future mediapipe release cannot drop it out from under us.
+matplotlib==3.11.1
+
+# OpenCV is intentionally NOT pinned here. mediapipe requires
+# `opencv-contrib-python` specifically, and adding `opencv-python-headless`
+# alongside it installs a second, conflicting copy of the same `cv2` module.
+# Letting mediapipe pull its own build is the reliable option - the non-headless
+# build then needs libgl1, which is why packages.txt exists.

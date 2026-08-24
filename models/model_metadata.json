@@ -1,0 +1,62 @@
+{
+  "model_name": "SafeFall_PoseCNN",
+  "created": "2026-08-17T23:54:55",
+  "framework": "TensorFlow 2.17.1 / Keras 3.15.1",
+  "python": "3.12.10",
+  "class_names": [
+    "Fall Detected",
+    "Normal Activity",
+    "Sitting",
+    "Standing",
+    "Walking"
+  ],
+  "geometric_feature_names": [
+    "torso_angle",
+    "body_axis_angle",
+    "bbox_aspect_ratio",
+    "bbox_height",
+    "bbox_width",
+    "hip_y",
+    "shoulder_y",
+    "ankle_y",
+    "head_y",
+    "center_of_mass_y",
+    "hip_to_ankle_ratio",
+    "head_above_hip",
+    "left_knee_angle",
+    "right_knee_angle",
+    "mean_knee_angle",
+    "left_hip_angle",
+    "right_hip_angle",
+    "mean_hip_angle",
+    "ankle_separation",
+    "knee_separation",
+    "shoulder_hip_width_ratio",
+    "leg_asymmetry",
+    "arm_asymmetry",
+    "vertical_horizontal_ratio",
+    "mean_visibility"
+  ],
+  "landmark_shape": [
+    33,
+    4
+  ],
+  "total_parameters": 127685,
+  "epochs_run": 18,
+  "best_epoch": 3,
+  "best_val_accuracy": 0.8905283212661743,
+  "final_train_accuracy": 0.9548961520195007,
+  "train_frames": 8425,
+  "val_frames": 2101,
+  "batch_size": 64,
+  "learning_rate": 0.0005,
+  "class_weighted": true,
+  "training_seconds": 101.2,
+  "split_ratio": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "split_granularity": "video-level (no frame leakage between splits)",
+  "frame_stride": 3
+}

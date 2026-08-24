@@ -1,0 +1,52 @@
+{
+  "seeds": [
+    42,
+    7,
+    2024
+  ],
+  "selected_on_validation": "ensemble of 3",
+  "validation": {
+    "single": {
+      "accuracy": 0.8905283198476915,
+      "macro_f1": 0.8740910514048306,
+      "fall_recall": 0.9351620947630923
+    },
+    "single + mirror TTA": {
+      "accuracy": 0.8924321751546882,
+      "macro_f1": 0.8761669858286634,
+      "fall_recall": 0.9501246882793017
+    },
+    "ensemble of 3": {
+      "accuracy": 0.8929081389814374,
+      "macro_f1": 0.8723978233674934,
+      "fall_recall": 0.940149625935162
+    },
+    "ensemble + mirror TTA": {
+      "accuracy": 0.8929081389814374,
+      "macro_f1": 0.8736041660899794,
+      "fall_recall": 0.9451371571072319
+    }
+  },
+  "test": {
+    "single": {
+      "accuracy": 0.8192405063291139,
+      "macro_f1": 0.7883011027120135,
+      "fall_recall": 0.8741258741258742
+    },
+    "single + mirror TTA": {
+      "accuracy": 0.8263291139240506,
+      "macro_f1": 0.7928589127316001,
+      "fall_recall": 0.9207459207459208
+    },
+    "ensemble of 3": {
+      "accuracy": 0.8268354430379747,
+      "macro_f1": 0.7898344095095738,
+      "fall_recall": 0.9090909090909091
+    },
+    "ensemble + mirror TTA": {
+      "accuracy": 0.8369620253164557,
+      "macro_f1": 0.7992974367943313,
+      "fall_recall": 0.9347319347319347
+    }
+  }
+}

@@ -1,0 +1,28 @@
+# SafeFall AI - full environment for reproducing the training pipeline.
+#
+#   pip install -r requirements-dev.txt
+#   python -m src.build_dataset      # MediaPipe pose extraction (~13 min)
+#   python -m src.labeling
+#   python -m src.split_dataset
+#   python -m src.train
+#   python -m src.export_model
+#   python -m src.evaluate
+#   python -m src.generate_evidence
+
+-r requirements.txt
+
+tensorflow-cpu==2.17.1
+scikit-learn==1.9.0
+matplotlib==3.11.1
+seaborn==0.13.2
+joblib==1.5.3
+
+# mediapipe 0.10.21 pulls in jax, which must stay compatible with the
+# ml-dtypes version TensorFlow 2.17 pins. Without this pin `import mediapipe`
+# fails with "module 'ml_dtypes' has no attribute 'float8_e3m4'".
+jax==0.4.38
+jaxlib==0.4.38
+
+# Optional, for running notebooks/SafeFall_AI_FA2_Pipeline.ipynb
+jupyter
+notebook

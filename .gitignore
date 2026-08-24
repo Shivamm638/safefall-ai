@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# The raw Le2i dataset is ~17 GB - it is never committed. Point the pipeline at
+# your own copy with the SAFEFALL_RAW_DATASET environment variable.
+Raw_Dataset/
+*.avi
+
+# Intermediate feature tables (~28 MB, regenerate with `python -m src.build_dataset`)
+data/processed/*.csv
+data/splits/*.csv
+
+# Local scratch
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,92 @@
+{
+  "chosen_window": 1,
+  "validation": [
+    {
+      "window": 1,
+      "accuracy": 0.8929081389814374,
+      "macro_f1": 0.8736041660899794,
+      "fall_recall": 0.9451371571072319
+    },
+    {
+      "window": 3,
+      "accuracy": 0.8624464540694907,
+      "macro_f1": 0.8425806223332415,
+      "fall_recall": 0.9351620947630923
+    },
+    {
+      "window": 5,
+      "accuracy": 0.829128986197049,
+      "macro_f1": 0.8091607414770701,
+      "fall_recall": 0.912718204488778
+    },
+    {
+      "window": 7,
+      "accuracy": 0.803426939552594,
+      "macro_f1": 0.7838738234106085,
+      "fall_recall": 0.885286783042394
+    },
+    {
+      "window": 9,
+      "accuracy": 0.7834364588291289,
+      "macro_f1": 0.7652224818347519,
+      "fall_recall": 0.85785536159601
+    },
+    {
+      "window": 11,
+      "accuracy": 0.7591623036649214,
+      "macro_f1": 0.7415168621152287,
+      "fall_recall": 0.8379052369077307
+    },
+    {
+      "window": 15,
+      "accuracy": 0.7177534507377439,
+      "macro_f1": 0.7050190432200308,
+      "fall_recall": 0.7955112219451371
+    }
+  ],
+  "test": [
+    {
+      "window": 1,
+      "accuracy": 0.8369620253164557,
+      "macro_f1": 0.7992974367943313,
+      "fall_recall": 0.9347319347319347
+    },
+    {
+      "window": 3,
+      "accuracy": 0.8075949367088607,
+      "macro_f1": 0.7703266462677401,
+      "fall_recall": 0.9277389277389277
+    },
+    {
+      "window": 5,
+      "accuracy": 0.7751898734177215,
+      "macro_f1": 0.7384600752427143,
+      "fall_recall": 0.9044289044289044
+    },
+    {
+      "window": 7,
+      "accuracy": 0.7508860759493671,
+      "macro_f1": 0.7141556502468246,
+      "fall_recall": 0.8741258741258742
+    },
+    {
+      "window": 9,
+      "accuracy": 0.7245569620253165,
+      "macro_f1": 0.6891526474376499,
+      "fall_recall": 0.8531468531468531
+    },
+    {
+      "window": 11,
+      "accuracy": 0.7063291139240506,
+      "macro_f1": 0.6721266077904953,
+      "fall_recall": 0.8251748251748252
+    },
+    {
+      "window": 15,
+      "accuracy": 0.6815189873417722,
+      "macro_f1": 0.6470937331731073,
+      "fall_recall": 0.7762237762237763
+    }
+  ],
+  "note": "Causal rolling mean of probability vectors within each video. Applies to video and live monitoring; a single uploaded photo has no temporal context and is unaffected."
+}
