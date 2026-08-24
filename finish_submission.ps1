@@ -52,15 +52,14 @@ $needed = @(
     "models/feature_scaler.json", "models/model_metadata.json",
     "results/metrics_summary.json"
 )
+# Read the pushed tree once, then check membership. (An earlier version tested
+# $LASTEXITCODE after a Select-String pipeline, which reports the exit code of
+# Select-String rather than of git, so it could both miss real failures and
+# double-count the same file as missing.)
+$tree = git ls-tree -r origin/main --name-only
 $missing = @()
 foreach ($f in $needed) {
-    git ls-tree -r origin/main --name-only | Select-String -SimpleMatch $f | Out-Null
-    if ($LASTEXITCODE -ne 0) { $missing += $f }
-}
-
-$tree = git ls-tree -r origin/main --name-only
-foreach ($f in $needed) {
-    if ($tree -notcontains $f) { $missing += $f } else { Write-Host "  OK    $f" }
+    if ($tree -contains $f) { Write-Host "  OK    $f" } else { $missing += $f }
 }
 $weights = ($tree | Where-Object { $_ -like "models/ensemble_member_*_weights.npz" }).Count
 Write-Host "  OK    $weights ensemble weight files"
