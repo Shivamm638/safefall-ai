@@ -17,9 +17,12 @@ matplotlib==3.11.1
 seaborn==0.13.2
 joblib==1.5.3
 
-# mediapipe 0.10.21 pulls in jax, which must stay compatible with the
-# ml-dtypes version TensorFlow 2.17 pins. Without this pin `import mediapipe`
-# fails with "module 'ml_dtypes' has no attribute 'float8_e3m4'".
+# Legacy mediapipe (<= 0.10.21) pulled in jax, which had to stay compatible with
+# the ml-dtypes version TensorFlow 2.17 pins - without these pins `import
+# mediapipe` failed with "module 'ml_dtypes' has no attribute 'float8_e3m4'".
+# mediapipe 0.10.33 no longer depends on jax, so this is now only a guard: the
+# pins are kept so the environment that produced the recorded training results
+# stays exactly reproducible.
 jax==0.4.38
 jaxlib==0.4.38
 

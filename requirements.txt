@@ -8,7 +8,10 @@
 #
 # To reproduce training instead, install requirements-dev.txt.
 
-streamlit==1.49.1
+# streamlit-webrtc 0.77 requires streamlit >= 1.51, so the old 1.49.1 pin made
+# the two unresolvable. 1.62.0 is the version this project is actually
+# developed and tested against locally.
+streamlit==1.62.0
 pandas==2.3.3
 
 # Real-time camera on the DEPLOYED app. OpenCV can only open a camera attached
@@ -22,45 +25,50 @@ plotly==6.9.0
 pillow==11.3.0
 
 # ---------------------------------------------------------------------------
-# MediaPipe: two incompatible eras, selected by interpreter
+# MediaPipe
 # ---------------------------------------------------------------------------
-# mediapipe <= 0.10.21 exposes `mp.solutions.pose` but publishes no wheels
-# above Python 3.12. Every release that DOES support 3.13/3.14 removed
-# `mp.solutions` entirely. No single version spans both, so the version is
-# chosen by environment marker and src/pose_backend.py adapts to whichever
-# API it finds - the legacy solutions API, or mediapipe.tasks.
+# MediaPipe split into two incompatible eras: <= 0.10.21 exposes
+# `mp.solutions.pose` but publishes no wheels above Python 3.12, while every
+# release that supports 3.13/3.14 removed `mp.solutions` entirely.
 #
-# Both drive the same BlazePose network. Verified identical on the bundled
-# samples: same predicted class every time, confidences agreeing to 3-4
-# decimals, trunk angles within 0.1 degrees.
-mediapipe==0.10.21; python_version < "3.13"
-mediapipe==0.10.33; python_version >= "3.13"
+# src/pose_backend.py detects which API is present and adapts, so either era
+# runs. For INSTALLATION there is no such ambiguity: the 0.10.33 wheel is
+# tagged `py3-none-manylinux_2_28_x86_64`, i.e. it carries no interpreter
+# version constraint at all, so one pin covers every Python this project runs
+# on - 3.12 locally and 3.14 on Streamlit Cloud. Pinning the legacy release
+# behind a marker bought nothing and dragged protobuf < 5 with it, which modern
+# Streamlit (protobuf >= 5.26.1) cannot satisfy.
+mediapipe==0.10.33
 
-# numpy: mediapipe 0.10.21 requires <2; 0.10.33 has no upper bound.
+# protobuf must be pinned. mediapipe 0.10.33 declares no constraint, but its
+# generated code still calls MessageFactory.GetPrototype, which protobuf 6
+# removed. Left unpinned, pip takes streamlit's `protobuf<8` and installs 7.x,
+# and every pose call then dies with:
+#     AttributeError: 'MessageFactory' object has no attribute 'GetPrototype'
+#
+# Verified directly: 5.29.5 detects all 33 landmarks, 6.33.1 raises. 5.29.5
+# also satisfies streamlit's protobuf >= 5.26.1.
+protobuf==5.29.5
+
+# numpy is the one dependency that genuinely differs by interpreter: 1.26.4
+# publishes no cp314 wheels, so Streamlit Cloud must take the 2.x line.
 numpy==1.26.4; python_version < "3.13"
 numpy>=2.1; python_version >= "3.13"
 
-# protobuf must be pinned on BOTH branches, for opposite reasons.
-#
-#   legacy mediapipe (<= 0.10.21) requires protobuf < 5;
-#   mediapipe 0.10.33 declares no constraint at all, but its generated code
-#   still calls MessageFactory.GetPrototype, which protobuf 6 removed. Left
-#   unpinned, pip takes streamlit's `protobuf<8` and installs 7.x, and every
-#   pose call then dies with:
-#       AttributeError: 'MessageFactory' object has no attribute 'GetPrototype'
-#
-# Verified directly: 5.29.5 detects all 33 landmarks, 6.33.1 raises. 5.29.5
-# also satisfies streamlit's protobuf>=5.26.1.
-protobuf==4.25.9; python_version < "3.13"
-protobuf==5.29.5; python_version >= "3.13"
-
 # MediaPipe's drawing_utils imports matplotlib at module load, so the pose
 # overlay silently depends on it. mediapipe declares it, but pinning it here
-# means a future release cannot drop it out from under us.
-matplotlib==3.11.1; python_version < "3.13"
-matplotlib; python_version >= "3.13"
+# means a future release cannot drop it out from under us. 3.11.1 ships cp312
+# and cp314 wheels, so no marker is needed.
+matplotlib==3.11.1
 
-# OpenCV is intentionally NOT pinned: mediapipe requires `opencv-contrib-python`
-# specifically, and adding `opencv-python-headless` alongside installs a second,
+# OpenCV comes in via mediapipe, which requires `opencv-contrib-python`
+# specifically - adding `opencv-python-headless` alongside it installs a second,
 # conflicting copy of the same `cv2` module. The non-headless build needs
 # libgl1, which is why packages.txt exists.
+#
+# The exact version is left to the resolver, but capped below 5.0. Unpinned,
+# pip takes the newest release, which is now the freshly published OpenCV 5.0 -
+# a major version this project has never been run against. The cap keeps the
+# deployed app on the same OpenCV 4 API line used in development (4.11 locally,
+# 4.14 on Python 3.14, which is the newest 4.x publishing cp314 wheels).
+opencv-contrib-python<5

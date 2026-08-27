@@ -53,11 +53,11 @@ The upload is about 36 MB and takes under a minute.
    - **Branch:** `main`
    - **Main file path:** `app.py`
    - **App URL:** something readable, e.g. `safefall-ai`
-4. Open **Advanced settings** and set **Python version to 3.11 or 3.12**.
-   MediaPipe 0.10.21 publishes no wheels for 3.13 — picking 3.13 is the single
-   most common way this build fails.
-5. **Deploy**. The first build takes 5–10 minutes (it is compiling MediaPipe and
-   OpenCV). Watch the log pane.
+4. Leave the **Python version** at its default — `requirements.txt` and
+   `src/pose_backend.py` between them handle whichever interpreter you get, so
+   there is nothing to choose here.
+5. **Deploy**. The first build takes 8–12 minutes (it is installing MediaPipe,
+   OpenCV and the WebRTC stack). Watch the log pane.
 
 You get a public URL like `https://safefall-ai.streamlit.app`.
 

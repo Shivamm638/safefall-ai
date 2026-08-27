@@ -93,12 +93,14 @@ git push -u origin main
    - **Branch:** `main`
    - **Main file path:** `app.py`
    - **App URL:** choose something readable, e.g. `safefall-ai`
-4. Open **Advanced settings** and set **Python version to 3.11** or **3.12**.
-   MediaPipe 0.10.21 does not publish wheels for 3.13, and picking a version
-   without wheels is the second most common deployment failure.
+4. Leave the **Python version** alone — the default is fine. `requirements.txt`
+   installs a MediaPipe build that publishes wheels for every interpreter
+   Streamlit Cloud offers, and `src/pose_backend.py` adapts to whichever
+   MediaPipe API that build exposes, so no version needs choosing by hand.
 5. Click **Deploy**.
 
-The first build takes 5–10 minutes — it is installing MediaPipe and OpenCV.
+The first build takes 8–12 minutes — it is installing MediaPipe, OpenCV and the
+WebRTC stack.
 Watch the log pane; when it finishes you get a public URL of the form
 `https://safefall-ai.streamlit.app`.
 
@@ -135,17 +137,33 @@ confusion matrix. Save them into `screenshots/`.
 ## Troubleshooting
 
 **Build fails on `mediapipe` — "no wheels with a matching Python ABI tag"**
-Streamlit Cloud gave the app a Python it cannot use. It defaults to the newest
-interpreter (3.14), and there is no MediaPipe release that works there:
+This is the problem the project used to have, and it is worth understanding
+because the fix shapes several files. MediaPipe split into two incompatible
+eras and no single release spans them:
 
-| MediaPipe | 3.13/3.14 wheels | `mp.solutions` API |
+| MediaPipe | 3.13 / 3.14 wheels | `mp.solutions` API |
 |---|---|---|
-| 0.10.21 | no | **yes** — required by this project |
-| 0.10.30 / 0.10.33 / 0.10.35 / 1.0.x | yes | **removed** |
+| ≤ 0.10.21 | no | **yes** — what the pipeline was written against |
+| ≥ 0.10.30 | yes | **removed** |
 
-Upgrading is therefore not an option — the newer releases dropped the entire
-`solutions` module the pipeline is built on. Fix it on the Python side:
-**Settings → General → Python version → 3.12** (or 3.11), then **Reboot app**.
+Pinning the old release fails to *build* on a modern interpreter; pinning a new
+one fails at *import*. Rather than depend on someone remembering to set a Python
+version in a web form, `src/pose_backend.py` detects which API is present and
+drives the same BlazePose network either way. `requirements.txt` therefore pins
+`mediapipe==0.10.33`, whose wheel is tagged `py3-none-manylinux_2_28_x86_64` —
+no interpreter constraint at all — so it installs on 3.12 and 3.14 alike.
+
+If you still hit this, `requirements.txt` has been edited back to a `0.10.21`
+pin. Restore `mediapipe==0.10.33`.
+
+**Build fails with `ResolutionImpossible` mentioning `streamlit-webrtc`**
+`streamlit-webrtc` 0.77 requires `streamlit >= 1.51`. If `requirements.txt`
+pins an older Streamlit the two cannot co-exist and pip refuses the whole file,
+so *nothing* installs. Keep `streamlit==1.62.0`.
+
+Note that pinning Streamlit also constrains protobuf: modern Streamlit requires
+`protobuf >= 5.26.1`, while legacy MediaPipe required `protobuf < 5`. Those two
+cannot both be satisfied — another reason the legacy MediaPipe branch is gone.
 
 **Build fails in the apt step with "held broken packages"**
 `packages.txt` is asking for a package name that does not exist on Streamlit
