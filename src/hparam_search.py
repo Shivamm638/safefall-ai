@@ -40,8 +40,8 @@ from .data import (
     raw_landmarks,
 )
 
-N_TRIALS = 14
-EPOCHS = 40
+N_TRIALS = 9
+EPOCHS = 22
 
 
 def sample_config(rng) -> dict:
@@ -53,7 +53,7 @@ def sample_config(rng) -> dict:
         "dropout_head2": float(rng.choice([0.20, 0.35, 0.45])),
         "width": float(rng.choice([1.0, 1.5, 2.0])),
         "batch_size": int(rng.choice([64, 128])),
-        "augment_copies": int(rng.choice([4, 6, 8])),
+        "augment_copies": int(rng.choice([4, 6])),
     }
 
 
@@ -78,9 +78,9 @@ def train_eval(cfg, data, seed=config.RANDOM_SEED, epochs=EPOCHS):
         epochs=epochs, batch_size=cfg["batch_size"],
         class_weight=class_weights(y_tr),
         callbacks=[
-            callbacks.EarlyStopping(monitor="val_accuracy", mode="max", patience=10,
+            callbacks.EarlyStopping(monitor="val_accuracy", mode="max", patience=7,
                                     restore_best_weights=True, verbose=0),
-            callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4,
+            callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3,
                                         min_lr=1e-5, verbose=0),
         ],
         verbose=0,
@@ -106,7 +106,7 @@ def main() -> None:
     # and reuse it across every trial that asks for it.
     print("Preparing augmented training sets...")
     train_sets = {}
-    for copies in (4, 6, 8):
+    for copies in (4, 6):
         x_lm, x_geo, y = build_augmented_set(raw_tr, y_raw, copies=copies)
         x_lm, x_geo = scaler.transform(x_lm, x_geo)
         train_sets[copies] = (x_lm, x_geo, y)
