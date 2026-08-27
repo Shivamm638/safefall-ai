@@ -1,11 +1,39 @@
 {
-  "cue": "shoulder_tilt",
-  "threshold": 26.0,
-  "validation_accuracy": 0.8461538461538461,
-  "test_accuracy": 0.7848101265822784,
-  "test_fall_recall": 0.9042553191489362,
-  "test_fall_precision": 0.7172995780590717,
-  "test_false_alarm_rate": 0.32367149758454106,
-  "test_crops": 395,
-  "note": "Measured on head-and-shoulders crops of held-out Le2i frames, which simulate a laptop-webcam view. Fall vs not-fall only - the upper body cannot distinguish walking from standing."
+  "detector": "learned upper-body (logistic)",
+  "features": [
+    "shoulder_tilt",
+    "head_axis_angle",
+    "trunk_angle",
+    "hips_visible",
+    "head_drop",
+    "torso_ratio",
+    "upper_aspect",
+    "shoulder_y",
+    "head_y",
+    "arm_spread",
+    "mean_visibility"
+  ],
+  "threshold": 0.6599999999999997,
+  "validation_accuracy": 0.9479583666933546,
+  "test_accuracy": 0.8970826580226904,
+  "test_fall_recall": 0.8986710963455149,
+  "test_fall_precision": 0.8912685337726524,
+  "test_false_alarm_rate": 0.10443037974683544,
+  "test_crops": 1234,
+  "per_view": {
+    "torso": {
+      "accuracy": 0.9025210084033614,
+      "fall_recall": 0.9036544850498339,
+      "fall_precision": 0.9036544850498339,
+      "false_alarm_rate": 0.09863945578231292
+    },
+    "head_shoulders": {
+      "accuracy": 0.892018779342723,
+      "fall_recall": 0.893687707641196,
+      "fall_precision": 0.8790849673202614,
+      "false_alarm_rate": 0.10946745562130178
+    }
+  },
+  "train_crops": 3516,
+  "note": "Measured on crops of held-out Le2i frames that mimic real camera views: a torso view (head to hips, legs out of shot) and a head-and-shoulders view. Fall vs not-fall only - the upper body cannot separate walking from standing."
 }

@@ -25,6 +25,7 @@ import numpy as np
 
 from . import config
 from .data import FeatureScaler
+from .upper_body_detector import assess as upper_body_assess
 from .pose_utils import (
     PoseEstimator,
     build_model_inputs,
@@ -254,12 +255,18 @@ class SafeFallPredictor:
         framing = check_framing(landmarks)
         if not framing.ok:
             height, width = frame_bgr.shape[:2]
-            is_fall, confidence, metrics = upper_body_fall_score(
+            is_fall, confidence, metrics = upper_body_assess(
                 landmarks, head_drop_per_sec, aspect=width / max(height, 1)
             )
             activity = config.FALL_CLASS if is_fall else "Normal Activity"
             probabilities = {name: 0.0 for name in config.CLASS_NAMES}
-            probabilities[config.FALL_CLASS] = confidence if is_fall else 1.0 - confidence
+            # Prefer the detector's own probability, rescaled so its operating
+            # point coincides with the live alarm's threshold. Only the
+            # geometric fallback has no probability of its own to report.
+            probabilities[config.FALL_CLASS] = float(metrics.get(
+                "alarm_probability",
+                confidence if is_fall else 1.0 - confidence,
+            ))
             probabilities["Normal Activity"] = 1.0 - probabilities[config.FALL_CLASS]
             return FramePrediction(
                 activity=activity,
@@ -270,17 +277,19 @@ class SafeFallPredictor:
                 geometry=compute_geometric_features(landmarks),
                 annotated_image=fallback_image,
                 message=(
-                    f"Upper-body mode: only head and shoulders are in shot, so the "
-                    f"full-body classifier cannot be used. Head axis "
-                    f"{metrics['head_axis_angle']:.0f}\u00b0 from vertical, shoulder "
-                    f"tilt {metrics['shoulder_tilt']:.0f}\u00b0"
+                    "Upper-body view: the legs are out of shot, so the five-class "
+                    "activity model is not used and the upper-body fall detector "
+                    "answers instead. "
+                    + (f"Trunk {metrics['trunk_angle']:.0f}\u00b0 from vertical, "
+                       if metrics.get("hips_visible") else "")
+                    + f"shoulder tilt {metrics['shoulder_tilt']:.0f}\u00b0"
                     + (" - consistent with a person on the floor."
                        if is_fall else " - consistent with an upright person.")
                 ),
                 framing_ok=False,
                 framing_score=framing.score,
                 framing_advice=framing.advice,
-                engine="upper-body geometry",
+                engine=metrics.get("engine", "upper-body geometry"),
             )
 
         if not pose_is_usable(landmarks):

@@ -371,24 +371,28 @@ def check_framing(lm: Optional[np.ndarray]) -> FramingReport:
     if hip_vis < HIP_MIN_VISIBILITY:
         return FramingReport(
             False, "hips-hidden",
-            "Move back - your hips need to be in shot. The system needs your "
-            "whole body, roughly 2-3 metres from the camera.", score, detail,
+            "Head and shoulders in shot. The upper-body detector is running and "
+            "will still raise a fall alert; including your hips would add the "
+            "trunk angle, and your legs would unlock the 5-class activity model.",
+            score, detail,
         )
     if ankle_vis < LOWER_BODY_MIN_VISIBILITY or knee_vis < LOWER_BODY_MIN_VISIBILITY:
         return FramingReport(
             False, "legs-hidden",
-            "Move back - your legs are out of shot. The model reads posture from "
-            "hips, knees and ankles, so it needs your whole body in frame.",
-            score, detail,
+            "Head, shoulders and hips in shot. The trunk angle is measured, so "
+            "falls are detected from this view; your legs in shot as well would "
+            "unlock the 5-class activity model.", score, detail,
         )
     if ankle_y > IN_FRAME_MARGIN:
         return FramingReport(
             False, "feet-below-frame",
-            "Your feet are below the bottom of the frame. Move back or tilt the "
-            "camera down.", score, detail,
+            "Your feet are below the frame, so posture is read from the upper "
+            "body. Falls are still detected; move back or tilt the camera down "
+            "to unlock the 5-class activity model.", score, detail,
         )
 
-    return FramingReport(True, "ok", "Full body in shot.", score, detail)
+    return FramingReport(True, "ok", "Whole body in shot - 5-class activity "
+                         "model active.", score, detail)
 
 
 # --------------------------------------------------------------------------- #
@@ -396,7 +400,9 @@ def check_framing(lm: Optional[np.ndarray]) -> FramingReport:
 # --------------------------------------------------------------------------- #
 # The trained CNN needs hips, knees and ankles, so it cannot be asked about a
 # desk-distance webcam that only sees head and shoulders. Rather than refuse to
-# answer, fall back to cues that ARE reliably measured from the upper body:
+# answer, a separate detector covers that view - see src/upper_body_detector.py
+# for the trained one that supersedes the rule below, which is kept as the
+# fallback when its weights are absent. The cues it reads:
 #
 #   * head axis  - the shoulder-midpoint -> nose vector. Standing, the head sits
 #                  directly above the shoulders (~0 deg from vertical). On the
@@ -455,6 +461,98 @@ def upper_body_metrics(lm: np.ndarray, aspect: float = 4.0 / 3.0) -> Dict[str, f
         "shoulder_y": float(shoulder_mid[1]),
         "shoulder_visibility": float(np.mean(lm[[L_SHOULDER, R_SHOULDER], 3])),
     }
+
+
+# Landmarks above the knee. Everything the upper-body model is allowed to see:
+# when the legs are out of shot MediaPipe still reports them, at invented
+# positions, so they must be excluded by construction rather than by trusting a
+# visibility score.
+UPPER_BODY_LANDMARKS = (NOSE, L_SHOULDER, R_SHOULDER, L_ELBOW, R_ELBOW,
+                        L_WRIST, R_WRIST, L_HIP, R_HIP)
+
+UPPER_FEATURE_NAMES = (
+    "shoulder_tilt",        # shoulder line away from horizontal
+    "head_axis_angle",      # head above shoulders, away from vertical
+    "trunk_angle",          # shoulders to hips, away from vertical - the fall cue
+    "hips_visible",         # gate: is trunk_angle meaningful at all
+    "head_drop",            # head height relative to shoulder width
+    "torso_ratio",          # torso length / shoulder width - foreshortens when lying
+    "upper_aspect",         # upper-body bounding box, width / height
+    "shoulder_y",           # how low in frame the shoulders sit
+    "head_y",
+    "arm_spread",           # wrists apart, relative to shoulder width
+    "mean_visibility",
+)
+
+
+def upper_body_features(lm: np.ndarray, aspect: float = 4.0 / 3.0) -> np.ndarray:
+    """Feature vector describing posture from the upper body alone.
+
+    The full-body CNN reads the kinematic chain down to the ankles, so it cannot
+    be asked anything when the legs are out of shot. This vector is what remains
+    genuinely observable, and it is deliberately visibility-aware: ``trunk_angle``
+    is the strongest single fall cue and needs only shoulders and hips - no legs -
+    so it is included whenever the hips are actually in shot, with
+    ``hips_visible`` telling the model whether to believe it.
+
+    ``aspect`` is the frame's width/height. MediaPipe normalises x and y
+    independently, so on a non-square frame equal numeric distances are
+    different physical distances; every x is scaled back before any angle.
+    """
+    shoulder_mid = _midpoint(lm, L_SHOULDER, R_SHOULDER)
+    hip_mid = _midpoint(lm, L_HIP, R_HIP)
+    nose = lm[NOSE, :3]
+
+    shoulder_vis = float(np.mean(lm[[L_SHOULDER, R_SHOULDER], 3]))
+    hip_vis = float(np.mean(lm[[L_HIP, R_HIP], 3]))
+    hips_visible = 1.0 if hip_vis >= HIP_MIN_VISIBILITY else 0.0
+
+    dx = float(lm[L_SHOULDER, 0] - lm[R_SHOULDER, 0]) * aspect
+    dy = float(lm[L_SHOULDER, 1] - lm[R_SHOULDER, 1])
+    shoulder_tilt = float(np.degrees(np.arctan2(abs(dy), abs(dx) + _EPS)))
+    shoulder_width = float(np.hypot(dx, dy)) + _EPS
+
+    head_axis_angle = _angle_from_vertical(
+        (nose[0] - shoulder_mid[0]) * aspect, nose[1] - shoulder_mid[1]
+    )
+
+    # Only meaningful with hips in shot; zeroed rather than fabricated otherwise,
+    # and the gate flag lets the model learn to ignore it in that case.
+    if hips_visible:
+        trunk_angle = _angle_from_vertical(
+            (shoulder_mid[0] - hip_mid[0]) * aspect, shoulder_mid[1] - hip_mid[1]
+        )
+        torso_length = float(np.hypot((shoulder_mid[0] - hip_mid[0]) * aspect,
+                                      shoulder_mid[1] - hip_mid[1]))
+        torso_ratio = torso_length / shoulder_width
+    else:
+        trunk_angle = 0.0
+        torso_ratio = 0.0
+
+    points = lm[list(UPPER_BODY_LANDMARKS), :2].copy()
+    if not hips_visible:
+        points = lm[[NOSE, L_SHOULDER, R_SHOULDER, L_ELBOW, R_ELBOW,
+                     L_WRIST, R_WRIST], :2].copy()
+    points[:, 0] *= aspect
+    width = float(np.ptp(points[:, 0])) + _EPS
+    height = float(np.ptp(points[:, 1])) + _EPS
+
+    wrist_dx = float(lm[L_WRIST, 0] - lm[R_WRIST, 0]) * aspect
+    wrist_dy = float(lm[L_WRIST, 1] - lm[R_WRIST, 1])
+
+    return np.array([
+        shoulder_tilt,
+        head_axis_angle,
+        trunk_angle,
+        hips_visible,
+        (shoulder_mid[1] - nose[1]) / shoulder_width,
+        torso_ratio,
+        width / height,
+        float(shoulder_mid[1]),
+        float(nose[1]),
+        float(np.hypot(wrist_dx, wrist_dy)) / shoulder_width,
+        float(np.mean([shoulder_vis, hip_vis])),
+    ], dtype=np.float32)
 
 
 def upper_body_fall_score(lm: np.ndarray, head_drop_per_sec: float = 0.0,

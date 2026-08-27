@@ -459,13 +459,24 @@ def frame_html(frame_bgr: np.ndarray, quality: int = 60,
 
 
 def framing_meter(score: float, ok: bool) -> str:
-    """A live read-out of whether the whole body is actually in shot."""
+    """Report which detector is answering - not whether the user is misframed.
+
+    Both views are supported: the whole body in shot unlocks the five-class
+    CNN, and an upper-body view is handled by the trained upper-body detector.
+    Colouring the second case as a warning implied the system had stopped
+    working, when in fact it had simply switched engines, so it is shown in the
+    ordinary accent colour with a label that says what is running.
+    """
     pct = max(min(score, 1.0), 0.0) * 100
-    colour = SUCCESS if ok else ("#F5B240" if pct > 35 else DANGER)
-    label = "Full body in shot" if ok else "Move back - body not fully in shot"
+    if ok:
+        colour = SUCCESS
+        label = "Whole body in shot &middot; 5-class activity model"
+    else:
+        colour = PRIMARY
+        label = "Upper-body view &middot; fall detection active"
     return (
         f'<div class="sf-frame-meter"><div class="t">'
-        f'<span style="color:{colour}">FRAMING &middot; {label}</span>'
+        f'<span style="color:{colour}">VIEW &middot; {label}</span>'
         f'<span style="color:{colour}">{pct:.0f}%</span></div>'
         f'<div class="sf-frame-track"><div class="sf-frame-fill" '
         f'style="width:{max(pct, 2):.0f}%;background:{colour}"></div></div></div>'
@@ -481,9 +492,9 @@ def live_panel_html(prediction, state) -> str:
     elif not prediction.framing_ok:
         # Still answering - just with the upper-body detector rather than the CNN.
         banner = status_banner(prediction.activity, prediction.confidence,
-                               prediction.message, "Upper-body mode",
+                               prediction.message, "Upper-body detector",
                                state.alarm_active)
-        bars = ""
+        bars = upper_body_bars(prediction.probabilities)
     else:
         banner = status_banner(prediction.activity, prediction.confidence,
                                prediction.message, "Live camera",
@@ -535,6 +546,32 @@ def live_panel_html(prediction, state) -> str:
           f'<b>{prediction.engine}</b></p>'
     )
     return banner + cards + bars
+
+
+def upper_body_bars(probabilities: dict) -> str:
+    """Fall / not-fall bars for the upper-body detector.
+
+    The five-class bars are deliberately not reused here. This detector only
+    ever answers one question, so rendering Sitting, Standing and Walking at
+    0.0% would assert three things it has not measured.
+    """
+    fall = float(probabilities.get(config.FALL_CLASS, 0.0))
+    rows = [
+        ("\U0001F6A8 On the floor", fall, config.CLASS_STYLE[config.FALL_CLASS]["color"]),
+        ("\U0001F9CD Upright", 1.0 - fall, config.CLASS_STYLE["Normal Activity"]["color"]),
+    ]
+    html = []
+    for label, value, colour in rows:
+        pct = value * 100
+        html.append(
+            f'<div class="sf-bar-row"><div class="sf-bar-top">'
+            f'<span>{label}</span><span>{pct:.1f}%</span></div>'
+            f'<div class="sf-bar-track"><div class="sf-bar-fill" '
+            f'style="width:{max(pct, 0.6):.1f}%;background:{colour}"></div></div></div>'
+        )
+    return (f'<div class="sf-bars">{"".join(html)}</div>'
+            '<p class="sf-note">Upper-body detector &mdash; it judges whether the '
+            'person is on the floor, not which activity they are performing.</p>')
 
 
 def probability_bars(probabilities: dict) -> str:
@@ -1118,10 +1155,11 @@ def _page_webrtc_camera(predictor: SafeFallPredictor, show_sound: bool) -> None:
         '<div class="sf-step"><div class="n">1</div><div class="b">'
         'Press <b>START</b> and allow camera access.</div></div>'
         '<div class="sf-step"><div class="n">2</div><div class="b">'
-        '<b>Stand back so your whole body is in shot</b>, head to feet.'
-        '<br><small>The bar along the bottom of the video turns green when the '
-        'framing is good. Close up, only the upper-body detector can run.</small>'
-        '</div></div>'
+        '<b>Sit or stand wherever suits you.</b> Head and shoulders is enough '
+        'to detect a fall.'
+        '<br><small>The bar along the bottom of the video shows how much of you '
+        'is in shot; with all of it the five-class activity model runs too.'
+        '</small></div></div>'
         '<div class="sf-step"><div class="n">3</div><div class="b">'
         'Walk, stand, sit, then lie down &mdash; the banner turns red once a fall '
         'holds for several frames.</div></div>'
@@ -1242,8 +1280,10 @@ def _rtc_panel_html(snap: dict) -> str:
         banner = ('<div class="sf-warn"><b>No person in view.</b><br>'
                   "Step into the camera's view.</div>")
     elif not snap["framing_ok"]:
-        banner = (f'<div class="sf-warn"><b>Upper-body mode.</b><br>'
-                  f'{snap["framing_advice"]}</div>')
+        icon = config.CLASS_STYLE.get(snap["activity"], {}).get("icon", "")
+        banner = (f'<div class="sf-safe"><h2>{icon} {snap["activity"].upper()}</h2>'
+                  f'<p>Confidence {snap["confidence"]:.0%} &middot; upper-body '
+                  f'detector</p></div>')
     else:
         icon = config.CLASS_STYLE.get(snap["activity"], {}).get("icon", "")
         banner = (f'<div class="sf-safe"><h2>{icon} {snap["activity"].upper()}</h2>'
@@ -1374,9 +1414,11 @@ def _page_direct_camera(predictor: SafeFallPredictor, show_sound: bool) -> None:
         '<div class="sf-step"><div class="n">1</div><div class="b">'
         'Switch <b>Camera on</b> and allow access when the browser asks.</div></div>'
         '<div class="sf-step"><div class="n">2</div><div class="b">'
-        '<b>Stand back so your whole body is in shot</b>, head to feet.'
-        '<br><small>The framing meter turns green when it is. Closer in, the '
-        'upper-body detector takes over.</small></div></div>'
+        '<b>Sit or stand wherever suits you.</b> Head and shoulders is enough '
+        'to detect a fall.'
+        '<br><small>With your whole body in shot the five-class activity '
+        'model runs as well, and the meter says which one is answering.'
+        '</small></div></div>'
         '<div class="sf-step"><div class="n">3</div><div class="b">'
         'Walk, stand, sit, then lie down &mdash; the banner turns red once a fall '
         'holds for several frames.</div></div>'

@@ -221,7 +221,9 @@ def _overlay_status(image: np.ndarray, snap: Dict) -> np.ndarray:
     if alarm:
         colour, label = (60, 60, 255), "FALL DETECTED - EMERGENCY"
     elif not ok:
-        colour, label = (64, 178, 245), "MOVE BACK - WHOLE BODY NOT IN SHOT"
+        # Not an error: the upper-body detector is answering, so show its
+        # verdict rather than an instruction to stand somewhere else.
+        colour, label = (190, 170, 60), snap["activity"].upper() + "  (UPPER BODY)"
     else:
         colour, label = (143, 190, 60), snap["activity"].upper()
 
