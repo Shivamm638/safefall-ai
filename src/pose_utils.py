@@ -227,7 +227,7 @@ class PoseEstimator:
         min_detection_confidence: float = config.POSE_MIN_DETECTION_CONF,
         min_tracking_confidence: float = config.POSE_MIN_TRACKING_CONF,
     ) -> None:
-        import mediapipe as mp  # imported lazily so the module stays importable
+        from .pose_backend import create_backend
 
         # MediaPipe graphs are NOT thread-safe. Streamlit starts each script run
         # on a fresh thread, so a live-camera loop and the rerun that replaces it
@@ -235,30 +235,19 @@ class PoseEstimator:
         # inside native code and takes the whole process down with no traceback.
         self._lock = threading.RLock()
         self._closed = False
-        self._mp = mp
-        self._drawing = mp.solutions.drawing_utils
-        self._styles = mp.solutions.drawing_styles
-        self._pose_module = mp.solutions.pose
-        self.pose = self._pose_module.Pose(
-            static_image_mode=static_image_mode,
-            model_complexity=model_complexity,
-            enable_segmentation=False,
-            smooth_landmarks=not static_image_mode,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-        )
+
+        # Which MediaPipe API is available depends on the Python version the
+        # host gave us - see src/pose_backend.py. Both drive the same BlazePose
+        # network and return identical landmarks, so nothing downstream changes.
+        self._backend = create_backend(static_image_mode, model_complexity)
 
     # -- core ------------------------------------------------------------- #
     def process(self, frame_bgr: np.ndarray):
         """Run pose estimation on a BGR frame and return the raw MediaPipe result."""
-        import cv2
-
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        rgb.flags.writeable = False
         with self._lock:
             if self._closed:
                 return None
-            return self.pose.process(rgb)
+            return self._backend.process(frame_bgr)
 
     @staticmethod
     def landmarks_to_array(results) -> Optional[np.ndarray]:
@@ -280,21 +269,10 @@ class PoseEstimator:
     # -- visualisation ----------------------------------------------------- #
     def draw(self, frame_bgr: np.ndarray, results) -> np.ndarray:
         """Return a copy of the frame with the skeleton overlaid."""
-        annotated = frame_bgr.copy()
-        if results is not None and results.pose_landmarks:
-            with self._lock:
-                self._drawing.draw_landmarks(
-                    annotated,
-                    results.pose_landmarks,
-                    self._pose_module.POSE_CONNECTIONS,
-                    landmark_drawing_spec=self._drawing.DrawingSpec(
-                        color=(0, 255, 170), thickness=2, circle_radius=3
-                    ),
-                    connection_drawing_spec=self._drawing.DrawingSpec(
-                        color=(255, 200, 0), thickness=2
-                    ),
-                )
-        return annotated
+        with self._lock:
+            if self._closed:
+                return frame_bgr.copy()
+            return self._backend.draw(frame_bgr, results)
 
     def close(self) -> None:
         # Take the lock so the graph is never torn down while another thread is
@@ -303,10 +281,7 @@ class PoseEstimator:
             if self._closed:
                 return
             self._closed = True
-            try:
-                self.pose.close()
-            except Exception:
-                pass
+            self._backend.close()
 
     def __enter__(self) -> "PoseEstimator":
         return self

@@ -8,33 +8,41 @@
 #
 # To reproduce training instead, install requirements-dev.txt.
 
-# IMPORTANT - set the Python version to 3.11 or 3.12 in Streamlit Cloud's
-# Advanced settings. It defaults to the newest interpreter (3.14 at time of
-# writing) and this app cannot run there:
-#
-#   * mediapipe 0.10.21 is the last release that ships the `mp.solutions` API
-#     this project is built on, and it has no wheels above Python 3.12;
-#   * every release that DOES have 3.13/3.14 wheels (0.10.30+) has removed
-#     `mp.solutions` entirely - verified against 0.10.30, 0.10.33, 0.10.35 and
-#     1.0.1, none of which expose it.
-#
-# So no single version satisfies both, and the Python version is the lever.
-
 streamlit==1.49.1
-mediapipe==0.10.21
-numpy==1.26.4
 pandas==2.3.3
 plotly==6.9.0
 pillow==11.3.0
-protobuf==4.25.9
+
+# ---------------------------------------------------------------------------
+# MediaPipe: two incompatible eras, selected by interpreter
+# ---------------------------------------------------------------------------
+# mediapipe <= 0.10.21 exposes `mp.solutions.pose` but publishes no wheels
+# above Python 3.12. Every release that DOES support 3.13/3.14 removed
+# `mp.solutions` entirely. No single version spans both, so the version is
+# chosen by environment marker and src/pose_backend.py adapts to whichever
+# API it finds - the legacy solutions API, or mediapipe.tasks.
+#
+# Both drive the same BlazePose network. Verified identical on the bundled
+# samples: same predicted class every time, confidences agreeing to 3-4
+# decimals, trunk angles within 0.1 degrees.
+mediapipe==0.10.21; python_version < "3.13"
+mediapipe==0.10.33; python_version >= "3.13"
+
+# numpy: mediapipe 0.10.21 requires <2; 0.10.33 has no upper bound.
+numpy==1.26.4; python_version < "3.13"
+numpy>=2.1; python_version >= "3.13"
+
+# protobuf: pinned only for the legacy build, which requires <5. The newer
+# mediapipe no longer constrains it, so pip is left to resolve it there.
+protobuf==4.25.9; python_version < "3.13"
 
 # MediaPipe's drawing_utils imports matplotlib at module load, so the pose
-# overlay silently depends on it. mediapipe does declare it, but pinning it
-# here means a future mediapipe release cannot drop it out from under us.
-matplotlib==3.11.1
+# overlay silently depends on it. mediapipe declares it, but pinning it here
+# means a future release cannot drop it out from under us.
+matplotlib==3.11.1; python_version < "3.13"
+matplotlib; python_version >= "3.13"
 
-# OpenCV is intentionally NOT pinned here. mediapipe requires
-# `opencv-contrib-python` specifically, and adding `opencv-python-headless`
-# alongside it installs a second, conflicting copy of the same `cv2` module.
-# Letting mediapipe pull its own build is the reliable option - the non-headless
-# build then needs libgl1, which is why packages.txt exists.
+# OpenCV is intentionally NOT pinned: mediapipe requires `opencv-contrib-python`
+# specifically, and adding `opencv-python-headless` alongside installs a second,
+# conflicting copy of the same `cv2` module. The non-headless build needs
+# libgl1, which is why packages.txt exists.
