@@ -139,16 +139,28 @@ class SafeFallPredictor:
         return self._pose_video
 
     def reset_video_tracker(self, complexity: Optional[int] = None) -> None:
-        """Drop MediaPipe's temporal state between two different videos.
+        """Prepare for a new video or live session.
 
-        ``complexity`` selects the pose model for the next session: 0 is the
-        lite network (~17 ms/frame here), 1 the full one (~22 ms/frame).
+        This used to close the MediaPipe graph and build a fresh one every time
+        a session started. That was the main source of instability: tearing down
+        a native graph while any other thread might still be inside it crashes
+        the whole process with no Python traceback, and Streamlit starts every
+        script run on a new thread, so "any other thread" is the normal case.
+
+        The rebuild bought nothing. MediaPipe's tracker keeps a region-of-interest
+        prior from the previous frame, and that prior self-corrects within a
+        frame or two of new footage - which the warm-up frames already absorb.
+
+        So the graph is now reused for the lifetime of the process, and is only
+        rebuilt when the pose model itself has to change (the quality selector),
+        which is rare and never happens mid-stream.
         """
         with self._lock:
-            if self._pose_video is not None:
-                self._pose_video.close()
-                self._pose_video = None
-            if complexity is not None:
+            if complexity is not None and complexity != self._video_complexity:
+                # Genuinely a different network - the graph must be replaced.
+                if self._pose_video is not None:
+                    self._pose_video.close()
+                    self._pose_video = None
                 self._video_complexity = complexity
 
     # ------------------------------------------------------------- prediction

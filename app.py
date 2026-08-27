@@ -993,8 +993,19 @@ def _run_live_loop(predictor, source, mirror: bool, skip: int, show_sound: bool,
             if not state.alarm_active:
                 alarm_sounded = False
 
+    except Exception as exc:  # noqa: BLE001
+        # Anything unexpected ends this session cleanly rather than leaving the
+        # page half-rendered with the camera still held open.
+        st.session_state[flag_key] = False
+        footer_slot.error(
+            f"Live monitoring stopped after an unexpected error: {exc} - "
+            "the camera has been released. Press Start to try again."
+        )
     finally:
-        cap.release()
+        try:
+            cap.release()
+        except Exception:
+            pass
 
     if state.elapsed >= config.LIVE_MAX_SECONDS:
         st.session_state[flag_key] = False
