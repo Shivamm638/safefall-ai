@@ -210,6 +210,45 @@ anything else is passed to `apt-get` as though it were a package.
 `models/` was not pushed — almost always because a global gitignore excluded it.
 Fix with `git add -f models/ && git commit && git push`.
 
+**Live Camera says "Connection is taking longer than expected"**
+The browser and the app cannot agree a route for the video. This is expected on
+a deployed host and needs no code change - only a credential.
+
+WebRTC needs both peers to find each other. A **STUN** server just tells each
+peer its own public address, which is enough when the browser and the app are
+the same machine, so this page always works locally. On Streamlit Cloud the app
+sits behind NAT that will not accept an inbound media connection, so a **TURN**
+relay has to forward the media instead. TURN costs bandwidth, so every provider
+requires an account; there is no anonymous public relay to fall back on.
+
+`src/webrtc_monitor.py` therefore passes no `iceServers` at all, which lets
+streamlit-webrtc provision a relay from whatever it finds in the environment:
+
+| Credential | Result |
+|---|---|
+| `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` | Twilio TURN (also needs `pip install twilio`) |
+| `HF_TOKEN` | Hugging Face TURN - free, no card |
+| none | Google STUN only; connects locally, usually not once deployed |
+
+The quickest route is a Hugging Face token:
+
+1. Sign in at <https://huggingface.co> and open **Settings -> Access Tokens**.
+2. Create a token with **read** permission and copy it.
+3. In Streamlit Cloud open **Manage app -> Settings -> Secrets** and add:
+
+   ```toml
+   HF_TOKEN = "hf_your_token_here"
+   ```
+
+4. Save and **Reboot app**.
+
+The Live Camera page reports which tier is active, so you can confirm the token
+was picked up without reading any logs. Treat the token as a password: it goes
+in Streamlit's secrets store, never in the repository.
+
+Note that this affects the live camera page only. **Upload & Analyse** and the
+**Snapshot** tab use ordinary HTTPS and work on the deployed app regardless.
+
 **The app runs out of memory**
 Check that `requirements.txt` does **not** contain `tensorflow`. The deployed app
 is designed to run the NumPy engine precisely so TensorFlow is never installed.

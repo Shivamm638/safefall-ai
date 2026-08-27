@@ -20,6 +20,7 @@ Shared state goes through a lock-protected object the page polls instead.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections import deque
@@ -31,11 +32,38 @@ import numpy as np
 
 from . import config
 
-# Public STUN server, needed so the browser and the Streamlit host can find a
-# route to each other through NAT. No media passes through it.
-RTC_CONFIGURATION = {
-    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-}
+# ICE configuration is deliberately NOT hard-coded here.
+#
+# A STUN server only tells each peer what its own public address is; it cannot
+# carry media. That is sufficient on a local machine, where the browser and the
+# app are the same computer, but rarely on a deployed one: the Streamlit Cloud
+# container sits behind NAT that will not accept an inbound media connection,
+# so the two peers never agree a route and the browser eventually reports
+# "Connection is taking longer than expected". Getting through that needs a
+# TURN relay, which forwards the media on the peers' behalf.
+#
+# streamlit-webrtc can provision one itself - it looks for Twilio or Hugging
+# Face credentials in the environment and falls back to Google's STUN server
+# when it finds neither. It only does so when `iceServers` is left unset, so
+# passing our own STUN-only configuration silently disabled the whole
+# mechanism. We now pass nothing and let the library choose, and merely report
+# which tier ended up in play.
+
+TURN_ENV_VARS = ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "HF_TOKEN")
+
+
+def turn_provider() -> str:
+    """Which relay streamlit-webrtc will use, judged from the environment.
+
+    Mirrors the precedence in ``streamlit_webrtc.credentials``. Returns
+    ``"none"`` when only STUN is available, i.e. when a deployed app is
+    unlikely to connect.
+    """
+    if os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_AUTH_TOKEN"):
+        return "twilio"
+    if os.getenv("HF_TOKEN"):
+        return "huggingface"
+    return "none"
 
 
 class LiveStats:

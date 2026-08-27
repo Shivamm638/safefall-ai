@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import tempfile
 import time
@@ -1086,9 +1087,10 @@ def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
         from streamlit_webrtc import WebRtcMode, webrtc_streamer
 
         from src.webrtc_monitor import (
-            RTC_CONFIGURATION,
+            TURN_ENV_VARS,
             LiveStats,
             make_frame_callback,
+            turn_provider,
         )
     except Exception as exc:  # noqa: BLE001
         st.markdown(
@@ -1129,6 +1131,44 @@ def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
         unsafe_allow_html=True,
     )
 
+    # streamlit-webrtc reads these with os.getenv. Streamlit Cloud usually
+    # mirrors secrets into the environment already, but that is not guaranteed,
+    # so copy them across explicitly before the streamer is built.
+    for _name in TURN_ENV_VARS:
+        if not os.environ.get(_name):
+            try:
+                _value = st.secrets[_name]
+            except Exception:  # noqa: BLE001 - no secrets file is normal
+                _value = None
+            if _value:
+                os.environ[_name] = str(_value)
+
+    relay = turn_provider()
+    if relay == "none":
+        st.markdown(
+            '<div class="sf-warn"><b>No video relay is configured, so this page '
+            'may not connect on the deployed link.</b><br>'
+            'A relay is what lets the browser and the app exchange video when '
+            'they sit on different networks. Without one the stream stalls on '
+            '&ldquo;Connection is taking longer than expected&rdquo;. Running '
+            'the app on your own machine does not need it, because the browser '
+            'and the app are then the same computer.<br><br>'
+            'To switch one on, add a free <b>Hugging Face</b> access token '
+            'under <b>Manage app &rarr; Settings &rarr; Secrets</b>:<br>'
+            '<code>HF_TOKEN = "hf_your_token_here"</code><br>'
+            'Save, reboot, and this page connects. No code changes needed.'
+            '<br><br>Until then, <b>Upload &amp; Analyse</b> and the '
+            '<b>Snapshot</b> tab work here exactly as they do locally.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f'<div class="sf-info">Video relay active via <b>{relay}</b>. '
+            'The relay forwards encrypted media only and cannot see your '
+            'video.</div>',
+            unsafe_allow_html=True,
+        )
+
     controls = st.columns([1, 1, 2])
     with controls[0]:
         mirror = st.toggle("Mirror view", value=True, key="rtc_mirror")
@@ -1148,7 +1188,6 @@ def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
             ctx = webrtc_streamer(
                 key="safefall-live",
                 mode=WebRtcMode.SENDRECV,
-                rtc_configuration=RTC_CONFIGURATION,
                 media_stream_constraints={
                     "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
                     "audio": False,
