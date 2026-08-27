@@ -178,24 +178,37 @@ module, which means a shared library it links against is absent. On Streamlit
 Cloud the message is redacted in the browser — open **Manage app** to see which
 `lib*.so` it names.
 
-`pip install opencv-contrib-python` does **not** install these. The wheel
-vendors 42 libraries but deliberately leaves the graphical and system ones to
-the OS, and they are what `packages.txt` exists to supply:
+**`OSError` from `ctypes.CDLL` / `_dlopen`, loading `libmediapipe.so`**
+The same fault in MediaPipe rather than OpenCV. `mediapipe.tasks` loads its
+native library through `ctypes`, and `dlopen` raises `OSError` when one of that
+library's dependencies is absent.
 
-| OpenCV needs | Debian trixie package |
-|---|---|
-| `libGL.so.1` | `libgl1` |
-| `libglib-2.0.so.0`, `libgthread-2.0.so.0` | `libglib2.0-0t64` |
-| `libSM.so.6` | `libsm6` |
-| `libICE.so.6` | `libice6` |
-| `libXext.so.6` | `libxext6` |
-| `libX11.so.6` | `libx11-6` |
-| `libxcb.so.1` | `libxcb1` |
-| `libz.so.1` | `zlib1g` |
+Neither `pip install opencv-contrib-python` nor `pip install mediapipe`
+installs these. The wheels vendor what they can — OpenCV ships 42 libraries
+inside itself — but deliberately leave the graphical and system ones to the OS,
+and supplying those is the whole job of `packages.txt`:
 
-This list is not folklore — it is the `DT_NEEDED` table of every `.so` in the
-wheel, minus the ones the wheel ships itself. It is identical for OpenCV 4.14
-and 5.0, so changing OpenCV version never fixes it.
+| Required by | Shared object | Debian trixie package |
+|---|---|---|
+| OpenCV | `libGL.so.1` | `libgl1` |
+| **MediaPipe** | `libEGL.so.1` | `libegl1` |
+| **MediaPipe** | `libGLESv2.so.2` | `libgles2` |
+| OpenCV | `libglib-2.0.so.0`, `libgthread-2.0.so.0` | `libglib2.0-0t64` |
+| OpenCV | `libSM.so.6` | `libsm6` |
+| OpenCV | `libICE.so.6` | `libice6` |
+| OpenCV | `libXext.so.6` | `libxext6` |
+| OpenCV | `libX11.so.6` | `libx11-6` |
+| OpenCV | `libxcb.so.1` | `libxcb1` |
+| OpenCV | `libz.so.1` | `zlib1g` |
+
+This list is not folklore. It is the `DT_NEEDED` table of every `.so` in every
+wheel the deployment installs, minus the ones those wheels ship themselves and
+minus glibc. The only other entry that scan turns up is `libmvec.so.1`, wanted
+by PyAV and part of `libc6`, so already present.
+
+It is identical for OpenCV 4.14 and 5.0, so changing OpenCV version never fixes
+it. If you add a dependency with native code, re-run that scan rather than
+guessing — each wrong guess costs a full rebuild.
 
 The trap is that **every `import cv2` in this project is lazy**, deep inside a
 function that only runs once you analyse something. A host missing these
