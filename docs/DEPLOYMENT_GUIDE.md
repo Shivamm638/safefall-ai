@@ -223,7 +223,23 @@ anything else is passed to `apt-get` as though it were a package.
 `models/` was not pushed — almost always because a global gitignore excluded it.
 Fix with `git add -f models/ && git commit && git push`.
 
-**Live Camera says "Connection is taking longer than expected"**
+**The Live Camera page: two transports**
+
+The page offers two ways to get video from the browser to the app, because the
+obvious one does not work on a deployed host without a credential.
+
+**Direct stream** is the default and needs nothing at all. The browser captures
+each frame and hands it to the script over the component channel - the same
+websocket that already carries every widget value - so it works on the public
+link for any visitor, with no relay and no configuration. Each frame costs one
+rerun, which measured 3.4 frames per second locally; expect rather less on
+Streamlit Cloud's single CPU. The alarm confirms over consecutive frames rather
+than reacting to one, so a lower rate costs a little latency, not accuracy.
+
+**WebRTC** is a true peer-to-peer media stream at full frame rate, and is the
+better option wherever a relay is available. It needs one, as below.
+
+**Live Camera (WebRTC) says "Connection is taking longer than expected"**
 The browser and the app cannot agree a route for the video. This is expected on
 a deployed host and needs no code change - only a credential.
 

@@ -1079,10 +1079,8 @@ def _snapshot_mode(predictor: SafeFallPredictor, show_sound: bool) -> None:
 # --------------------------------------------------------------------------- #
 # PAGE - Real-time camera over WebRTC (works on the deployed app)
 # --------------------------------------------------------------------------- #
-def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
-    st.markdown('<div class="sf-section">Real-time camera monitoring</div>',
-                unsafe_allow_html=True)
-
+def _page_webrtc_camera(predictor: SafeFallPredictor, show_sound: bool) -> None:
+    """Peer-to-peer media stream. Higher frame rate, but needs a relay."""
     try:
         from streamlit_webrtc import WebRtcMode, webrtc_streamer
 
@@ -1296,6 +1294,192 @@ def _render_rtc_summary(snap: dict) -> None:
     fig = distribution_chart(snap["activity_counts"], "Activity distribution")
     if fig:
         st.plotly_chart(fig, use_container_width=True)
+
+# --------------------------------------------------------------------------- #
+# PAGE - Real-time camera. Two transports, same analysis.
+# --------------------------------------------------------------------------- #
+def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
+    st.markdown('<div class="sf-section">Real-time camera monitoring</div>',
+                unsafe_allow_html=True)
+
+    mode = st.radio(
+        "How should the video reach the app?",
+        ["Direct stream", "WebRTC"],
+        horizontal=True,
+        key="rt_transport",
+        captions=[
+            "Works on the deployed link with no setup. A few frames per second.",
+            "Full frame rate, but needs a TURN relay to be configured.",
+        ],
+    )
+    if mode == "Direct stream":
+        _page_direct_camera(predictor, show_sound)
+    else:
+        _page_webrtc_camera(predictor, show_sound)
+
+
+CAMERA_KEY = "safefall_browser_camera"
+
+
+def _page_direct_camera(predictor: SafeFallPredictor, show_sound: bool) -> None:
+    """Live monitoring without WebRTC, and therefore without a relay.
+
+    The browser captures each frame and hands it to this script over the
+    component channel - the same websocket the dashboard already uses. Every
+    frame costs a rerun, so the rate is a few per second rather than 15-30,
+    which the alarm absorbs because it confirms over consecutive frames.
+    """
+    try:
+        from src.browser_camera import browser_camera, decode_frame
+        from src.live_camera import LiveMonitorState
+    except Exception as exc:  # noqa: BLE001
+        st.markdown(
+            f'<div class="sf-warn"><b>Direct streaming is unavailable.</b><br>'
+            f'<code>{type(exc).__name__}: {exc}</code></div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        '<div class="sf-info">Your browser opens the camera and sends each frame '
+        'to the app over the same connection the dashboard already uses, so this '
+        'works on the deployed link with <b>no relay and no configuration</b>.<br>'
+        'Frames are analysed and discarded as they arrive; nothing is recorded '
+        'or stored.</div>',
+        unsafe_allow_html=True,
+    )
+
+    if "direct_state" not in st.session_state:
+        st.session_state.direct_state = LiveMonitorState()
+        st.session_state.direct_seq = None
+        st.session_state.direct_last = None
+
+    controls = st.columns([1, 1, 1.5, 1])
+    with controls[0]:
+        running = st.toggle("Camera on", value=False, key="direct_running")
+    with controls[1]:
+        mirror = st.toggle("Mirror view", value=True, key="direct_mirror")
+    with controls[2]:
+        detail = st.select_slider("Detail", options=["Fast", "Balanced", "Sharp"],
+                                  value="Balanced", key="direct_detail")
+    with controls[3]:
+        if st.button("Reset session", key="direct_reset", use_container_width=True):
+            st.session_state.direct_state = LiveMonitorState()
+            st.session_state.direct_seq = None
+            st.session_state.direct_last = None
+    width = {"Fast": 320, "Balanced": 480, "Sharp": 640}[detail]
+
+    st.markdown(
+        '<div class="sf-steps">'
+        '<div class="sf-step"><div class="n">1</div><div class="b">'
+        'Switch <b>Camera on</b> and allow access when the browser asks.</div></div>'
+        '<div class="sf-step"><div class="n">2</div><div class="b">'
+        '<b>Stand back so your whole body is in shot</b>, head to feet.'
+        '<br><small>The framing meter turns green when it is. Closer in, the '
+        'upper-body detector takes over.</small></div></div>'
+        '<div class="sf-step"><div class="n">3</div><div class="b">'
+        'Walk, stand, sit, then lie down &mdash; the banner turns red once a fall '
+        'holds for several frames.</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Read the browser's latest payload from session state and analyse it
+    # BEFORE re-rendering the component, so the acknowledgement it receives is
+    # the frame just processed. Rendering first would acknowledge the previous
+    # frame, the handshake would never release, and the stream would crawl
+    # along on its safety-net timer instead.
+    state = st.session_state.direct_state
+    payload = st.session_state.get(CAMERA_KEY)
+
+    camera_error = None
+    just_fired = False
+    if isinstance(payload, dict):
+        if payload.get("error"):
+            camera_error = payload["error"]
+        elif (payload.get("frame")
+                and payload.get("seq") != st.session_state.direct_seq):
+            st.session_state.direct_seq = payload["seq"]
+            frame = decode_frame(payload["frame"])
+            if frame is not None:
+                prediction = predictor.predict_image(
+                    frame, draw=True, static=False, enforce_framing=True
+                )
+                just_fired = state.update(prediction)
+                st.session_state.direct_last = prediction
+
+    feed, panel = st.columns([1.3, 1])
+    with feed:
+        browser_camera(
+            running=running, width=width, mirror=mirror,
+            ack=int(st.session_state.direct_seq or 0), key=CAMERA_KEY,
+        )
+
+    if camera_error:
+        with panel:
+            st.markdown(
+                '<div class="sf-warn"><b>The browser could not open the camera.</b>'
+                f'<br><code>{camera_error}</code><br><br>'
+                'Check the camera permission for this site, and that no other '
+                'application is holding the camera.</div>',
+                unsafe_allow_html=True,
+            )
+        return
+
+    prediction = st.session_state.direct_last
+
+    with panel:
+        if prediction is None:
+            st.markdown(
+                '<div class="sf-info">Switch the camera on to begin. The first '
+                'reading appears within a second or two.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                framing_meter(prediction.framing_score, prediction.framing_ok),
+                unsafe_allow_html=True,
+            )
+            st.markdown(live_panel_html(prediction, state), unsafe_allow_html=True)
+
+    if prediction is not None and prediction.annotated_image is not None:
+        with feed:
+            st.markdown(frame_html(prediction.annotated_image, max_width=520),
+                        unsafe_allow_html=True)
+            st.markdown(
+                '<p class="sf-note">Latest analysed frame, with the 33 pose '
+                'landmarks drawn on. The picture above is your camera at full '
+                'rate; this one updates as each frame comes back from the '
+                'model.</p>',
+                unsafe_allow_html=True,
+            )
+
+    if just_fired and show_sound:
+        st.audio(alert_tone(), format="audio/wav", autoplay=True)
+
+    if not running and state.frames:
+        _render_direct_summary(state)
+
+
+def _render_direct_summary(state) -> None:
+    section("Last session")
+    cols = st.columns(3)
+    cols[0].markdown(
+        card("Frames analysed", f"{state.frames:,}",
+             f"{state.elapsed:.0f} seconds monitored", "\U0001F39E\uFE0F"),
+        unsafe_allow_html=True)
+    cols[1].markdown(
+        card("Fall alerts", f"{len(state.fall_events)}", "confirmed events",
+             "\U0001F6A8", DANGER if state.fall_events else INK),
+        unsafe_allow_html=True)
+    cols[2].markdown(
+        card("Frames with a person", f"{state.frames_with_person:,}",
+             f"of {state.frames:,} analysed", "\U0001F464"),
+        unsafe_allow_html=True)
+    fig = distribution_chart(state.activity_counts, "Activity distribution")
+    if fig:
+        st.plotly_chart(fig, use_container_width=True)
+
 
 # --------------------------------------------------------------------------- #
 # PAGE - CCTV / IP camera
