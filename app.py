@@ -1093,8 +1093,12 @@ def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
     except Exception as exc:  # noqa: BLE001
         st.markdown(
             f'<div class="sf-warn"><b>Real-time streaming is unavailable.</b><br>'
-            f'streamlit-webrtc could not be imported: {exc}<br><br>'
-            "Use <b>Upload &amp; Analyse</b> or the snapshot capture instead.</div>",
+            f'<code>{type(exc).__name__}: {exc}</code><br><br>'
+            "An <code>ImportError</code> naming a <code>lib*.so</code> file means the "
+            "host is missing a system library that OpenCV needs &mdash; add it to "
+            "<code>packages.txt</code> and reboot. Everything else on this dashboard "
+            "still works: use <b>Upload &amp; Analyse</b> or the snapshot capture."
+            "</div>",
             unsafe_allow_html=True,
         )
         return
@@ -1140,19 +1144,29 @@ def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
     feed_col, panel_col = st.columns([1.35, 1])
 
     with feed_col:
-        ctx = webrtc_streamer(
-            key="safefall-live",
-            mode=WebRtcMode.SENDRECV,
-            rtc_configuration=RTC_CONFIGURATION,
-            media_stream_constraints={
-                "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
-                "audio": False,
-            },
-            video_frame_callback=make_frame_callback(
-                predictor, stats, analyse_every=analyse_every, mirror=mirror
-            ),
-            async_processing=True,
-        )
+        try:
+            ctx = webrtc_streamer(
+                key="safefall-live",
+                mode=WebRtcMode.SENDRECV,
+                rtc_configuration=RTC_CONFIGURATION,
+                media_stream_constraints={
+                    "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
+                    "audio": False,
+                },
+                video_frame_callback=make_frame_callback(
+                    predictor, stats, analyse_every=analyse_every, mirror=mirror
+                ),
+                async_processing=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            st.markdown(
+                f'<div class="sf-warn"><b>Could not start the video stream.</b><br>'
+                f'<code>{type(exc).__name__}: {exc}</code><br><br>'
+                "The rest of the dashboard is unaffected &mdash; use "
+                "<b>Upload &amp; Analyse</b> or the snapshot capture.</div>",
+                unsafe_allow_html=True,
+            )
+            return
 
     with panel_col:
         placeholder = st.empty()

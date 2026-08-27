@@ -25,6 +25,8 @@ import time
 from collections import deque
 from typing import Deque, Dict, Optional
 
+import av
+import cv2
 import numpy as np
 
 from . import config
@@ -142,9 +144,6 @@ def make_frame_callback(predictor, stats: LiveStats, analyse_every: int = 2,
     most recent annotated result is reused in between, which keeps the skeleton
     on screen without paying for it on every frame.
     """
-    import av
-    import cv2
-
     state = {"count": 0, "last_annotated": None, "last_shape": None}
 
     def callback(frame: "av.VideoFrame") -> "av.VideoFrame":
@@ -186,8 +185,6 @@ def _overlay_status(image: np.ndarray, snap: Dict) -> np.ndarray:
     the browser and cannot be overlaid with Streamlit widgets, and the metric
     panel beside it only refreshes when the page reruns.
     """
-    import cv2
-
     out = image
     height, width = out.shape[:2]
     alarm = snap["alarm_active"]

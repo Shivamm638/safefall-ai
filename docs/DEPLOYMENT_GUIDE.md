@@ -167,15 +167,44 @@ cannot both be satisfied — another reason the legacy MediaPipe branch is gone.
 
 **Build fails in the apt step with "held broken packages"**
 `packages.txt` is asking for a package name that does not exist on Streamlit
-Cloud's Debian **trixie** image. `libglib2.0-0` is the usual culprit - it was
-renamed `libglib2.0-0t64` in the 64-bit time_t transition, so the old name only
-matches the stale bullseye repo and drags in `libffi7`/`libpcre3`, which trixie
-does not ship. Keep `packages.txt` to `libgl1` alone; glib is already in the
-base image.
+Cloud's Debian **trixie** image. `libglib2.0-0` is the usual culprit: it was
+renamed `libglib2.0-0t64` in the 64-bit `time_t` transition, so the old name
+only matches the stale bullseye repo still listed in the image's sources and
+drags in `libffi7`/`libpcre3`, which trixie does not ship. Use the `t64` name.
 
-**`ImportError: libGL.so.1`**
-`packages.txt` is missing or was not committed. It must contain `libgl1`.
-Confirm with `git ls-files packages.txt`.
+**`ImportError` from `cv2/__init__.py`, in `bootstrap()`**
+The Python side of OpenCV imported fine and then failed to load its *native*
+module, which means a shared library it links against is absent. On Streamlit
+Cloud the message is redacted in the browser — open **Manage app** to see which
+`lib*.so` it names.
+
+`pip install opencv-contrib-python` does **not** install these. The wheel
+vendors 42 libraries but deliberately leaves the graphical and system ones to
+the OS, and they are what `packages.txt` exists to supply:
+
+| OpenCV needs | Debian trixie package |
+|---|---|
+| `libGL.so.1` | `libgl1` |
+| `libglib-2.0.so.0`, `libgthread-2.0.so.0` | `libglib2.0-0t64` |
+| `libSM.so.6` | `libsm6` |
+| `libICE.so.6` | `libice6` |
+| `libXext.so.6` | `libxext6` |
+| `libX11.so.6` | `libx11-6` |
+| `libxcb.so.1` | `libxcb1` |
+| `libz.so.1` | `zlib1g` |
+
+This list is not folklore — it is the `DT_NEEDED` table of every `.so` in the
+wheel, minus the ones the wheel ships itself. It is identical for OpenCV 4.14
+and 5.0, so changing OpenCV version never fixes it.
+
+The trap is that **every `import cv2` in this project is lazy**, deep inside a
+function that only runs once you analyse something. A host missing these
+libraries therefore starts up, renders, and looks perfectly healthy until the
+first frame is processed. If you change `packages.txt`, prove it by actually
+running an analysis on the deployed app, not by watching it load.
+
+Keep `packages.txt` to bare package names, one per line, with no comments —
+anything else is passed to `apt-get` as though it were a package.
 
 **"Trained model files were not found"**
 `models/` was not pushed — almost always because a global gitignore excluded it.
