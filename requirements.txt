@@ -10,6 +10,14 @@
 
 streamlit==1.49.1
 pandas==2.3.3
+
+# Real-time camera on the DEPLOYED app. OpenCV can only open a camera attached
+# to the machine running the process, which in the cloud is a server with none -
+# so the deployed app could otherwise offer still snapshots only. streamlit-webrtc
+# streams the *viewer's* browser camera to the app instead, giving genuine
+# real-time monitoring from wherever the visitor is. Pure-Python wheels, and `av`
+# ships cp314 wheels, so this installs on the interpreter Streamlit Cloud provides.
+streamlit-webrtc==0.77.0
 plotly==6.9.0
 pillow==11.3.0
 
@@ -32,9 +40,19 @@ mediapipe==0.10.33; python_version >= "3.13"
 numpy==1.26.4; python_version < "3.13"
 numpy>=2.1; python_version >= "3.13"
 
-# protobuf: pinned only for the legacy build, which requires <5. The newer
-# mediapipe no longer constrains it, so pip is left to resolve it there.
+# protobuf must be pinned on BOTH branches, for opposite reasons.
+#
+#   legacy mediapipe (<= 0.10.21) requires protobuf < 5;
+#   mediapipe 0.10.33 declares no constraint at all, but its generated code
+#   still calls MessageFactory.GetPrototype, which protobuf 6 removed. Left
+#   unpinned, pip takes streamlit's `protobuf<8` and installs 7.x, and every
+#   pose call then dies with:
+#       AttributeError: 'MessageFactory' object has no attribute 'GetPrototype'
+#
+# Verified directly: 5.29.5 detects all 33 landmarks, 6.33.1 raises. 5.29.5
+# also satisfies streamlit's protobuf>=5.26.1.
 protobuf==4.25.9; python_version < "3.13"
+protobuf==5.29.5; python_version >= "3.13"
 
 # MediaPipe's drawing_utils imports matplotlib at module load, so the pose
 # overlay silently depends on it. mediapipe declares it, but pinning it here

@@ -1074,6 +1074,176 @@ def _snapshot_mode(predictor: SafeFallPredictor, show_sound: bool) -> None:
 
 
 
+
+# --------------------------------------------------------------------------- #
+# PAGE - Real-time camera over WebRTC (works on the deployed app)
+# --------------------------------------------------------------------------- #
+def page_realtime(predictor: SafeFallPredictor, show_sound: bool) -> None:
+    st.markdown('<div class="sf-section">Real-time camera monitoring</div>',
+                unsafe_allow_html=True)
+
+    try:
+        from streamlit_webrtc import WebRtcMode, webrtc_streamer
+
+        from src.webrtc_monitor import (
+            RTC_CONFIGURATION,
+            LiveStats,
+            make_frame_callback,
+        )
+    except Exception as exc:  # noqa: BLE001
+        st.markdown(
+            f'<div class="sf-warn"><b>Real-time streaming is unavailable.</b><br>'
+            f'streamlit-webrtc could not be imported: {exc}<br><br>'
+            "Use <b>Upload &amp; Analyse</b> or the snapshot capture instead.</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        '<div class="sf-info">This page streams <b>your own camera</b> from the '
+        'browser to the app, so it gives real-time monitoring even on the '
+        'deployed link &mdash; unlike the Laptop Webcam page, which can only '
+        'reach a camera attached to the machine running the app.<br>'
+        'Your browser will ask for camera permission. Video is processed and '
+        'discarded frame by frame; nothing is recorded or stored.</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="sf-steps">'
+        '<div class="sf-step"><div class="n">1</div><div class="b">'
+        'Press <b>START</b> and allow camera access.</div></div>'
+        '<div class="sf-step"><div class="n">2</div><div class="b">'
+        '<b>Stand back so your whole body is in shot</b>, head to feet.'
+        '<br><small>The bar along the bottom of the video turns green when the '
+        'framing is good. Close up, only the upper-body detector can run.</small>'
+        '</div></div>'
+        '<div class="sf-step"><div class="n">3</div><div class="b">'
+        'Walk, stand, sit, then lie down &mdash; the banner turns red once a fall '
+        'holds for several frames.</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    controls = st.columns([1, 1, 2])
+    with controls[0]:
+        mirror = st.toggle("Mirror view", value=True, key="rtc_mirror")
+    with controls[1]:
+        quality = st.select_slider("Processing", options=["Smooth", "Balanced", "Accurate"],
+                                   value="Balanced", key="rtc_quality")
+    analyse_every = {"Smooth": 3, "Balanced": 2, "Accurate": 1}[quality]
+
+    if "rtc_stats" not in st.session_state:
+        st.session_state.rtc_stats = LiveStats()
+    stats: LiveStats = st.session_state.rtc_stats
+
+    feed_col, panel_col = st.columns([1.35, 1])
+
+    with feed_col:
+        ctx = webrtc_streamer(
+            key="safefall-live",
+            mode=WebRtcMode.SENDRECV,
+            rtc_configuration=RTC_CONFIGURATION,
+            media_stream_constraints={
+                "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
+                "audio": False,
+            },
+            video_frame_callback=make_frame_callback(
+                predictor, stats, analyse_every=analyse_every, mirror=mirror
+            ),
+            async_processing=True,
+        )
+
+    with panel_col:
+        placeholder = st.empty()
+
+    if not ctx.state.playing:
+        with panel_col:
+            st.markdown(
+                '<div class="sf-info">Press <b>START</b> under the video to begin.</div>',
+                unsafe_allow_html=True)
+        snap = stats.snapshot()
+        if snap["frames"]:
+            _render_rtc_summary(snap)
+        return
+
+    # While the stream runs, poll the shared stats and repaint the panel. The
+    # frame callback lives on a WebRTC worker thread and must never touch
+    # st.session_state, so this is the only safe direction for the data to flow.
+    import time as _time
+
+    for _ in range(240):                       # ~2 minutes per script run
+        if not ctx.state.playing:
+            break
+        snap = stats.snapshot()
+        placeholder.markdown(_rtc_panel_html(snap), unsafe_allow_html=True)
+        _time.sleep(0.5)
+    st.rerun()
+
+
+def _rtc_panel_html(snap: dict) -> str:
+    """Side panel for the real-time page, rendered as a single block."""
+    if snap["alarm_active"]:
+        banner = (f'<div class="sf-alert"><h2>&#128680; EMERGENCY &mdash; FALL DETECTED</h2>'
+                  f'<p>Confirmed over {config.LIVE_CONFIRM_FRAMES} consecutive frames. '
+                  "Dispatch a caregiver and check the resident for injury.</p></div>")
+    elif snap["activity"] == "No person in view":
+        banner = ('<div class="sf-warn"><b>No person in view.</b><br>'
+                  "Step into the camera's view.</div>")
+    elif not snap["framing_ok"]:
+        banner = (f'<div class="sf-warn"><b>Upper-body mode.</b><br>'
+                  f'{snap["framing_advice"]}</div>')
+    else:
+        icon = config.CLASS_STYLE.get(snap["activity"], {}).get("icon", "")
+        banner = (f'<div class="sf-safe"><h2>{icon} {snap["activity"].upper()}</h2>'
+                  f'<p>Confidence {snap["confidence"]:.0%} &middot; status normal</p></div>')
+
+    accuracy = load_class_accuracy()
+    if snap["framing_ok"] and snap["activity"] in accuracy:
+        acc_value = f"{accuracy[snap['activity']]:.0%}"
+        acc_sub = f"measured precision for &lsquo;{snap['activity']}&rsquo;"
+    elif snap["activity"] != "No person in view" and not snap["framing_ok"]:
+        upper = load_upper_body_accuracy()
+        acc_value = f"{upper['test_accuracy']:.0%}" if upper else "n/a"
+        acc_sub = "upper-body detector"
+    else:
+        acc_value, acc_sub = "--", "waiting for a person"
+
+    cards = (
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:.2rem 0 .6rem">'
+        + card("Live accuracy", acc_value, acc_sub, "\U0001F3AF", PRIMARY)
+        + card("Confidence", f"{snap['confidence']:.0%}",
+               f"rolling avg {snap['rolling_confidence']:.0%}", "\U0001F4CA",
+               DANGER if snap["alarm_active"] else INK)
+        + "</div>"
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:0 0 .6rem">'
+        + card("Fall alerts", f"{len(snap['fall_events'])}",
+               f"{snap['elapsed']:.0f}s monitored", "\U0001F6A8",
+               DANGER if snap["fall_events"] else INK)
+        + card("Frames", f"{snap['frames']:,}",
+               f"{snap['fps']:.1f} fps analysed", "\U0001F39E\uFE0F")
+        + "</div>"
+        + f'<p class="sf-note">Engine: <b>{snap["engine"] or "-"}</b></p>'
+    )
+    return banner + cards
+
+
+def _render_rtc_summary(snap: dict) -> None:
+    section("Last real-time session")
+    cols = st.columns(3)
+    cols[0].markdown(card("Frames analysed", f"{snap['frames']:,}",
+                          f"{snap['elapsed']:.0f} seconds", "\U0001F39E\uFE0F"),
+                     unsafe_allow_html=True)
+    cols[1].markdown(card("Fall alerts", f"{len(snap['fall_events'])}",
+                          "confirmed events", "\U0001F6A8",
+                          DANGER if snap["fall_events"] else INK), unsafe_allow_html=True)
+    cols[2].markdown(card("Full-body frames", f"{snap['frames_with_person'] - snap['frames_out_of_frame']:,}",
+                          f"of {snap['frames_with_person']:,} with a person",
+                          "\U0001F464"), unsafe_allow_html=True)
+    fig = distribution_chart(snap["activity_counts"], "Activity distribution")
+    if fig:
+        st.plotly_chart(fig, use_container_width=True)
+
 # --------------------------------------------------------------------------- #
 # PAGE - CCTV / IP camera
 # --------------------------------------------------------------------------- #
@@ -1650,7 +1820,8 @@ def page_about() -> None:
 # Main
 # --------------------------------------------------------------------------- #
 PAGES = {
-    "\U0001F4BB  Laptop Webcam": "live",
+    "\U0001F534  Live Camera (real-time)": "realtime",
+    "\U0001F4BB  Laptop Webcam (local)": "live",
     "\U0001F4E1  CCTV / IP Camera": "cctv",
     "\U0001F4CA  Upload & Analyse": "monitor",
     "\U0001F4C8  Analytics": "analytics",
@@ -1738,7 +1909,9 @@ def main() -> None:
         )
         st.caption("FA-2 · Machine Learning & Deep Learning")
 
-    if page == "live":
+    if page == "realtime":
+        page_realtime(predictor, show_sound)
+    elif page == "live":
         page_live(predictor, show_sound)
     elif page == "cctv":
         page_cctv(predictor, show_sound)
