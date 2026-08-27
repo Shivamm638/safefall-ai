@@ -138,9 +138,17 @@ confusion matrix. Save them into `screenshots/`.
 The Python version is wrong. Go to **Settings → General**, set Python to 3.11 or
 3.12, and reboot the app. MediaPipe has no wheels for 3.13.
 
-**`ImportError: libGL.so.1` or `libgthread`**
-`packages.txt` is missing or was not committed. It must contain `libgl1` and
-`libglib2.0-0`. Confirm with `git ls-files packages.txt`.
+**Build fails in the apt step with "held broken packages"**
+`packages.txt` is asking for a package name that does not exist on Streamlit
+Cloud's Debian **trixie** image. `libglib2.0-0` is the usual culprit - it was
+renamed `libglib2.0-0t64` in the 64-bit time_t transition, so the old name only
+matches the stale bullseye repo and drags in `libffi7`/`libpcre3`, which trixie
+does not ship. Keep `packages.txt` to `libgl1` alone; glib is already in the
+base image.
+
+**`ImportError: libGL.so.1`**
+`packages.txt` is missing or was not committed. It must contain `libgl1`.
+Confirm with `git ls-files packages.txt`.
 
 **"Trained model files were not found"**
 `models/` was not pushed — almost always because a global gitignore excluded it.
