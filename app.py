@@ -1874,6 +1874,24 @@ def main() -> None:
         )
         st.stop()
 
+    # OpenCV's native module is imported lazily by every page that analyses a
+    # frame, so a host missing one of its shared libraries looks perfectly
+    # healthy - model loaded, metrics rendered - right up until the first
+    # analysis, and then dies with a redacted traceback on whichever page
+    # happened to touch it first. Fail once, here, and say what is actually
+    # wrong.
+    try:
+        import cv2  # noqa: F401
+    except Exception as exc:  # noqa: BLE001
+        st.error(
+            f"OpenCV could not be loaded: `{type(exc).__name__}: {exc}`\n\n"
+            "The Python package is installed, but its native module needs system "
+            "libraries this host does not have. Add the missing `lib*.so` to "
+            "`packages.txt` and reboot the app - the full set OpenCV requires is "
+            "tabulated in `docs/DEPLOYMENT_GUIDE.md`."
+        )
+        st.stop()
+
     predictor = load_predictor()
     metrics = load_metrics()
 
