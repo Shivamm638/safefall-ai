@@ -134,9 +134,18 @@ confusion matrix. Save them into `screenshots/`.
 
 ## Troubleshooting
 
-**Build fails on `mediapipe`**
-The Python version is wrong. Go to **Settings → General**, set Python to 3.11 or
-3.12, and reboot the app. MediaPipe has no wheels for 3.13.
+**Build fails on `mediapipe` — "no wheels with a matching Python ABI tag"**
+Streamlit Cloud gave the app a Python it cannot use. It defaults to the newest
+interpreter (3.14), and there is no MediaPipe release that works there:
+
+| MediaPipe | 3.13/3.14 wheels | `mp.solutions` API |
+|---|---|---|
+| 0.10.21 | no | **yes** — required by this project |
+| 0.10.30 / 0.10.33 / 0.10.35 / 1.0.x | yes | **removed** |
+
+Upgrading is therefore not an option — the newer releases dropped the entire
+`solutions` module the pipeline is built on. Fix it on the Python side:
+**Settings → General → Python version → 3.12** (or 3.11), then **Reboot app**.
 
 **Build fails in the apt step with "held broken packages"**
 `packages.txt` is asking for a package name that does not exist on Streamlit

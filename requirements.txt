@@ -8,6 +8,18 @@
 #
 # To reproduce training instead, install requirements-dev.txt.
 
+# IMPORTANT - set the Python version to 3.11 or 3.12 in Streamlit Cloud's
+# Advanced settings. It defaults to the newest interpreter (3.14 at time of
+# writing) and this app cannot run there:
+#
+#   * mediapipe 0.10.21 is the last release that ships the `mp.solutions` API
+#     this project is built on, and it has no wheels above Python 3.12;
+#   * every release that DOES have 3.13/3.14 wheels (0.10.30+) has removed
+#     `mp.solutions` entirely - verified against 0.10.30, 0.10.33, 0.10.35 and
+#     1.0.1, none of which expose it.
+#
+# So no single version satisfies both, and the Python version is the lever.
+
 streamlit==1.49.1
 mediapipe==0.10.21
 numpy==1.26.4
