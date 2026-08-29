@@ -306,6 +306,35 @@ Hyper-parameters (learning rate, batch size, augmentation strength) were selecte
 by comparing **validation** accuracy. The test split was scored once, with the
 selected configuration.
 
+That selection was later checked properly rather than left as a claim. A random
+search over 10 configurations - learning rate, dropout, L2, batch size, network
+width and augmentation strength - was run and scored on validation
+(`python -m src.hparam_search`, 72 minutes; full results in
+`results/hparam_search.json`). **Nothing beat the hand-tuned baseline**, which
+took 0.8905; the best of the nine random trials reached 0.8901
+(trial-3), and the remaining eight came in below that.
+
+The negative result is more informative than a small gain would have been,
+because of *what* failed. The search varied width specifically on the suspicion
+that 128k parameters were too few to separate Normal Activity, the class
+dragging macro F1 down. Doubling the width made things **worse**, not better
+(0.8896, 0.8829, 0.8810, 0.8743 against 0.8905), and heavier augmentation did not help
+either (0.8901, 0.8843, 0.8839, 0.8810). Capacity and training data volume are
+therefore not what is limiting that class.
+
+That is consistent with what the confusion matrix shows. Normal Activity is
+defined as a trunk inclined between 28 and 55 degrees - bending, reaching,
+crouching - and a fall *passes through exactly those postures* on its way to the
+floor. The frames the model gets wrong sit at the top of that band (median trunk
+angle 54 degrees against 15 for the ones it gets right), and two videos alone
+supply 65 of the 93 Normal-to-Fall errors. In one of them the resident is lying
+horizontally on furniture in a clip with no annotated fall: the label is right
+and the model is wrong, and no amount of extra width will fix it, because a
+single frame of pose does not carry the information needed to tell a sofa from
+a floor. What would is a per-video reference height - the same signal the
+labelling rules already use - which the network is not currently given.
+
+
 ### 5.2 Inference and emergency logic
 
 **Single image.** Fall alert if the fall probability exceeds the alert threshold.
@@ -586,18 +615,28 @@ and the retraining plan.
 
 ### Planned improvements
 
-1. **Temporal model.** A 1-D CNN or LSTM over a window of frames would separate
+1. **A height reference the network can see.** The strongest identified gap:
+   give the model the per-video reference height the labelling rules already
+   compute, so "lower than this person stood earlier" becomes an input rather
+   than something the network has to infer from absolute frame position. This is
+   the change most likely to move Normal Activity, which the hyper-parameter
+   search showed is not limited by capacity. It needs care at inference, where a
+   single uploaded photo has no video to reference.
+2. **Temporal model.** A 1-D CNN or LSTM over a window of frames would separate
    Walking from Standing by motion rather than posture, and would catch slow
-   "slump" falls that a single frame cannot express.
-2. **Real elderly footage.** Collect and annotate genuine care-home video,
+   "slump" falls that a single frame cannot express. Note that frame-to-frame
+   speed alone does not separate falls from bending here - measured AUC 0.43 for
+   hip speed and 0.56 for aspect rate - because much of the Fall class is a
+   resident lying still after the event.
+3. **Real elderly footage.** Collect and annotate genuine care-home video,
    including slow falls, getting-out-of-bed events and walker/frame users.
-3. **Low-light and infrared.** Add infrared samples and augment with brightness,
+4. **Low-light and infrared.** Add infrared samples and augment with brightness,
    blur and noise to harden detection at night, when falls are most common.
-4. **Fewer false alerts.** A short "are you OK?" confirmation window before
+5. **Fewer false alerts.** A short "are you OK?" confirmation window before
    escalation, and agreement between two cameras before a hard alert.
-5. **Better elderly-posture recognition.** Fine-tune the pose model on stooped
+6. **Better elderly-posture recognition.** Fine-tune the pose model on stooped
    postures, walking frames and wheelchairs, which BlazePose handles less well.
-6. **Real-time CCTV/RTSP** ingestion with push notification to caregiver phones.
+7. **Real-time CCTV/RTSP** ingestion with push notification to caregiver phones.
 
 ### Retraining cycle
 

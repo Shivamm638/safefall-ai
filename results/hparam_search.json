@@ -1,0 +1,184 @@
+{
+  "trials": [
+    {
+      "name": "baseline",
+      "config": {
+        "learning_rate": 0.0005,
+        "l2": 0.0001,
+        "dropout_geo": 0.3,
+        "dropout_head1": 0.45,
+        "dropout_head2": 0.35,
+        "width": 1.0,
+        "batch_size": 64,
+        "augment_copies": 4
+      },
+      "val_accuracy": 0.8905283198476915,
+      "val_macro_f1": 0.8740910514048306
+    },
+    {
+      "name": "trial-3",
+      "config": {
+        "learning_rate": 0.0005,
+        "l2": 0.0001,
+        "dropout_geo": 0.3,
+        "dropout_head1": 0.45,
+        "dropout_head2": 0.2,
+        "width": 1.0,
+        "batch_size": 128,
+        "augment_copies": 6
+      },
+      "val_accuracy": 0.8900523560209425,
+      "val_macro_f1": 0.8654019160011821
+    },
+    {
+      "name": "trial-5",
+      "config": {
+        "learning_rate": 0.001,
+        "l2": 0.0001,
+        "dropout_geo": 0.3,
+        "dropout_head1": 0.55,
+        "dropout_head2": 0.35,
+        "width": 2.0,
+        "batch_size": 128,
+        "augment_copies": 4
+      },
+      "val_accuracy": 0.8895763921941933,
+      "val_macro_f1": 0.867674250532904
+    },
+    {
+      "name": "trial-9",
+      "config": {
+        "learning_rate": 0.0005,
+        "l2": 0.0001,
+        "dropout_geo": 0.3,
+        "dropout_head1": 0.45,
+        "dropout_head2": 0.35,
+        "width": 1.5,
+        "batch_size": 128,
+        "augment_copies": 6
+      },
+      "val_accuracy": 0.8843407900999524,
+      "val_macro_f1": 0.86391631887898
+    },
+    {
+      "name": "trial-1",
+      "config": {
+        "learning_rate": 0.001,
+        "l2": 3e-05,
+        "dropout_geo": 0.4,
+        "dropout_head1": 0.55,
+        "dropout_head2": 0.2,
+        "width": 1.0,
+        "batch_size": 64,
+        "augment_copies": 6
+      },
+      "val_accuracy": 0.8838648262732033,
+      "val_macro_f1": 0.8597942777230871
+    },
+    {
+      "name": "trial-2",
+      "config": {
+        "learning_rate": 0.001,
+        "l2": 0.0003,
+        "dropout_geo": 0.4,
+        "dropout_head1": 0.55,
+        "dropout_head2": 0.2,
+        "width": 2.0,
+        "batch_size": 128,
+        "augment_copies": 4
+      },
+      "val_accuracy": 0.8829128986197049,
+      "val_macro_f1": 0.8542577068444868
+    },
+    {
+      "name": "trial-6",
+      "config": {
+        "learning_rate": 0.0003,
+        "l2": 0.0003,
+        "dropout_geo": 0.2,
+        "dropout_head1": 0.55,
+        "dropout_head2": 0.45,
+        "width": 1.0,
+        "batch_size": 64,
+        "augment_copies": 4
+      },
+      "val_accuracy": 0.8829128986197049,
+      "val_macro_f1": 0.856451069648838
+    },
+    {
+      "name": "trial-7",
+      "config": {
+        "learning_rate": 0.0005,
+        "l2": 3e-05,
+        "dropout_geo": 0.3,
+        "dropout_head1": 0.45,
+        "dropout_head2": 0.35,
+        "width": 1.0,
+        "batch_size": 128,
+        "augment_copies": 4
+      },
+      "val_accuracy": 0.8814850071394574,
+      "val_macro_f1": 0.860042512510031
+    },
+    {
+      "name": "trial-4",
+      "config": {
+        "learning_rate": 0.0005,
+        "l2": 3e-05,
+        "dropout_geo": 0.2,
+        "dropout_head1": 0.3,
+        "dropout_head2": 0.45,
+        "width": 2.0,
+        "batch_size": 64,
+        "augment_copies": 6
+      },
+      "val_accuracy": 0.8810090433127082,
+      "val_macro_f1": 0.8507643665428335
+    },
+    {
+      "name": "trial-8",
+      "config": {
+        "learning_rate": 0.0005,
+        "l2": 0.0003,
+        "dropout_geo": 0.4,
+        "dropout_head1": 0.3,
+        "dropout_head2": 0.45,
+        "width": 2.0,
+        "batch_size": 128,
+        "augment_copies": 4
+      },
+      "val_accuracy": 0.8743455497382199,
+      "val_macro_f1": 0.8518425069611476
+    }
+  ],
+  "best": {
+    "name": "baseline",
+    "config": {
+      "learning_rate": 0.0005,
+      "l2": 0.0001,
+      "dropout_geo": 0.3,
+      "dropout_head1": 0.45,
+      "dropout_head2": 0.35,
+      "width": 1.0,
+      "batch_size": 64,
+      "augment_copies": 4
+    },
+    "val_accuracy": 0.8905283198476915,
+    "val_macro_f1": 0.8740910514048306
+  },
+  "baseline": {
+    "name": "baseline",
+    "config": {
+      "learning_rate": 0.0005,
+      "l2": 0.0001,
+      "dropout_geo": 0.3,
+      "dropout_head1": 0.45,
+      "dropout_head2": 0.35,
+      "width": 1.0,
+      "batch_size": 64,
+      "augment_copies": 4
+    },
+    "val_accuracy": 0.8905283198476915,
+    "val_macro_f1": 0.8740910514048306
+  }
+}
