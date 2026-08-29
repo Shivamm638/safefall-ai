@@ -362,6 +362,63 @@ caregiver.
 
 ---
 
+### 5.4 When the legs are out of shot
+
+The CNN reads the kinematic chain down to the ankles, so it cannot be asked
+anything when the legs are outside the frame - MediaPipe still reports those
+joints, at invented positions, and any answer would be computed from
+coordinates that do not exist. That view is not an edge case: a laptop webcam at
+desk distance sees head, shoulders and perhaps hips, and nothing below.
+
+Refusing to answer there would be the wrong behaviour for a safety system, so a
+second detector covers it. Its first version was a single hand-tuned rule -
+shoulder tilt beyond 26 degrees - which measured 78.5% accuracy on held-out
+crops with a **32.4% false-alarm rate**: one upright frame in three raised an
+alert. That is not usable, and it was leaving two things unused.
+
+*Hips.* The first version cropped to head and shoulders only. But the framing
+check also rejects frames where the hips **are** visible and merely the legs are
+not. Shoulders plus hips give the **trunk angle**, the canonical fall cue, which
+needs no legs at all.
+
+*Evidence.* One threshold on one cue cannot combine evidence; several features
+and a trained classifier can.
+
+The detector is therefore a logistic model over 11 visibility-aware features, with
+`trunk_angle` gated by a `hips_visible` flag so the model learns when to believe
+it. It was trained on 3,516 crops built from the training videos in two views that
+mimic real cameras - a torso view (head to hips) and a head-and-shoulders view -
+each re-run through pose estimation so the landmark normalisation matches what
+inference will see. Model and operating point were chosen on validation and
+scored once on 1,234 held-out crops:
+
+| | first version | trained detector |
+|---|---|---|
+| accuracy | 78.5% | **89.7%** |
+| fall precision | 71.7% | **89.1%** |
+| false-alarm rate | 32.4% | **10.4%** |
+| fall recall | 90.4% | 89.9% |
+
+The threshold sweep refused any operating point below 0.90 validation recall, so
+the collapse in false alarms is not paid for with missed falls. Broken down by
+view, the torso case reaches 90.3% and the harder head-and-shoulders case
+89.2% - the view the original 78.5% was measured on.
+
+Two properties matter for deployment. It runs through the same exported-weights
+NumPy path as the main classifier, so the deployed app still carries no
+deep-learning framework; the runtime was verified against scikit-learn to 2.2e-16
+with 100% agreement on the decision. And its probability is mapped onto the alarm
+scale by a monotonic piecewise-linear rescale, so its 0.66 operating point lands
+exactly on the live alarm's 0.25 threshold and the two cannot disagree.
+
+What it does **not** do is claim more than it measured. It answers one question -
+is this person on the floor - and the interface shows fall/upright bars rather
+than five-class bars, because the upper body cannot separate walking from
+standing. The dashboard reports which engine answered, so the reading is never
+mistaken for the five-class output.
+
+Reproduce with: `python -m src.upper_body_train`
+
 ## 6. Evaluation
 
 All numbers below come from the **held-out test split**: 1,975 frames from 20

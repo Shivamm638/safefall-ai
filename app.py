@@ -319,7 +319,7 @@ def load_class_accuracy() -> dict:
 
 @st.cache_data(show_spinner=False)
 def load_upper_body_accuracy() -> dict:
-    """Measured accuracy of the upper-body detector (src/upper_body_eval.py)."""
+    """Measured accuracy of the upper-body detector (src/upper_body_train.py)."""
     path = config.RESULTS_DIR / "upper_body_eval.json"
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
