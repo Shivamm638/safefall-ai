@@ -493,7 +493,50 @@ almost always assigns a higher fall probability to a fall frame than to a
 non-fall frame. That is what makes threshold tuning a legitimate lever rather
 than wishful thinking.
 
-### 6.4 Testing on unseen data
+### 6.4 Does it actually raise the alarm? Event-level evaluation
+
+Everything above is measured per frame, but the system does not alert per frame.
+It raises an emergency only when the fall probability stays above the threshold
+for 4 consecutive analysed frames. That confirmation window is what a
+caregiver experiences, and per-frame numbers judge it unfairly in both
+directions: one stray frame above threshold is not a false alarm, because the
+window absorbs it, and missing three frames of a forty-frame fall is not a
+missed fall.
+
+So the deployed alarm was evaluated as the state machine it is
+(`python -m src.alert_policy_eval`). Every frame is scored with the deployed
+predictor, each video is replayed in order through the exact live logic, and
+alert **episodes** are counted rather than frames.
+
+| | validation | test |
+|---|---|---|
+| videos | 19 (15 containing a real fall) | 20 (15 containing a real fall) |
+| falls detected | 13/15 | **15/15** |
+| falls missed | 2 | **0** |
+| median alert latency | 0.52 s | **0.52 s** |
+| false-alarm episodes | 0 over 3.8 quiet min | 3 over 3.2 quiet min |
+
+**Every fall in the held-out test videos was detected, none was missed, and the
+alarm fired a median of 0.52 seconds after the fall began.** That is a more
+faithful statement of the system's behaviour than the per-frame fall precision
+of 0.749, which counts each individual frame of an already-detected fall.
+
+The threshold and window were then swept together on the validation videos
+(8 window lengths x 15 thresholds). No operating point was better than the
+deployed one on both detection and false alarms, so it was left alone. One
+alternative caught a fourteenth validation fall but cost two extra false-alarm
+episodes; another removed the confirmation window entirely, which the sweep
+liked and which was rejected on design grounds, because a window of one means a
+single stray frame raises an emergency.
+
+That "two extra episodes" is the important caveat. The validation split holds
+only 3.8 minutes of fall-free footage and the test split 3.2, so a
+false-alarm *rate* here is a handful of episodes extrapolated to an hour. The
+evaluation is strong enough to confirm that the deployed policy detects every
+test fall promptly, and too small to justify fine-tuning it further. Ranking
+operating points on this much quiet footage would be fitting noise.
+
+### 6.5 Testing on unseen data
 
 The rubric asks for validation data, test data and genuinely new material. All
 three were used:
@@ -515,7 +558,7 @@ those rooms comes from the posture rule rather than human annotation — so part
 the gap is reference noise rather than model failure. But it is also a fair
 warning that a new room should be validated before the system is trusted in it.
 
-### 6.5 Reading the confusion matrix
+### 6.6 Reading the confusion matrix
 
 See `results/confusion_matrix.png` and the written analysis in
 `results/confusion_matrix_analysis.txt`.
@@ -551,7 +594,7 @@ swaps between two *safe* activities that never change the alert the caregiver
 sees. The clinically meaningful error rate is far lower than the raw accuracy
 figure suggests.
 
-### 6.6 Visual evidence
+### 6.7 Visual evidence
 
 | File | What it shows |
 |---|---|
