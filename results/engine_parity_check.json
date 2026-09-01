@@ -1,4 +1,21 @@
 {
+  "ensemble_members": [
+    {
+      "member": "ensemble_member_0",
+      "max_abs_difference": 1.0132789611816406e-06,
+      "class_agreement": 1.0
+    },
+    {
+      "member": "ensemble_member_1",
+      "max_abs_difference": 1.3113021850585938e-06,
+      "class_agreement": 1.0
+    },
+    {
+      "member": "ensemble_member_2",
+      "max_abs_difference": 1.7881393432617188e-06,
+      "class_agreement": 1.0
+    }
+  ],
   "samples": 1975,
   "max_abs_difference": 1.0132789611816406e-06,
   "mean_abs_difference": 3.726282216121035e-08,

@@ -1,0 +1,54 @@
+{
+  "question": "Would rebuilding the dataset at FRAME_STRIDE=1 improve accuracy?",
+  "method": "Subsample training frames within each video to simulate coarser strides, train the deployed configuration on each, score on the full untouched validation split. Two seeds per point so the trend can be read against seed noise.",
+  "epochs": 22,
+  "points": [
+    {
+      "keep_every": 4,
+      "effective_stride": 12,
+      "train_frames": 2135,
+      "normal_activity_frames": 179,
+      "augmented_samples": 10675,
+      "val_accuracy_mean": 0.873155640171347,
+      "val_accuracy_std": 0.0021418372203712566,
+      "val_macro_f1_mean": 0.8426174095676765,
+      "seeds": [
+        42,
+        7
+      ]
+    },
+    {
+      "keep_every": 2,
+      "effective_stride": 6,
+      "train_frames": 4238,
+      "normal_activity_frames": 347,
+      "augmented_samples": 21190,
+      "val_accuracy_mean": 0.8833888624464541,
+      "val_accuracy_std": 0.005235602094240843,
+      "val_macro_f1_mean": 0.8586971878843648,
+      "seeds": [
+        42,
+        7
+      ]
+    },
+    {
+      "keep_every": 1,
+      "effective_stride": 3,
+      "train_frames": 8425,
+      "normal_activity_frames": 676,
+      "augmented_samples": 42125,
+      "val_accuracy_mean": 0.8938600666349357,
+      "val_accuracy_std": 0.003331746787244183,
+      "val_macro_f1_mean": 0.8743914931345829,
+      "seeds": [
+        42,
+        7
+      ]
+    }
+  ],
+  "gain_over_range": 0.02070442646358872,
+  "gain_last_doubling": 0.010471204188481575,
+  "seed_noise": 0.005235602094240843,
+  "rebuild_worth_running": true,
+  "verdict": "Still climbing faster than seed noise - a stride-1 rebuild is likely to help."
+}
